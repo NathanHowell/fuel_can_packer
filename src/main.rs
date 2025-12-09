@@ -168,7 +168,7 @@ fn solve_with_z3(cans: &[Can], total_fuel: i32) -> Result<Solution, String> {
     let fuel_sum = Int::add(fuel_vars.iter().cloned().collect::<Vec<_>>().as_slice());
     opt.assert(&fuel_sum.eq(&Int::from_i64(total_fuel as i64)));
 
-    // Objective: minimize empty weight then pairings (weighted single objective)
+    // Objective: minimize empty weight, then pairings, then total transferred (lexicographic objectives)
     let empty_terms: Vec<Int> = keep_vars
         .iter()
         .zip(cans.iter())
@@ -182,13 +182,20 @@ fn solve_with_z3(cans: &[Can], total_fuel: i32) -> Result<Solution, String> {
         .collect();
     let pair_count = Int::add(pair_count_terms.as_slice());
 
-    // Weight pairs so empty weight is always preferred first.
-    // Max empty weight ~1000s; max pair count n^2 <= 10k typical. Weight big enough.
-    let combined = Int::add(&[
-        Int::mul(&[empty_cost.clone(), Int::from_i64(10_000)]),
-        pair_count.clone(),
-    ]);
-    opt.minimize(&combined);
+    let transfer_terms: Vec<Int> = transfer_vars
+        .iter()
+        .enumerate()
+        .flat_map(|(d, row)| {
+            row.iter()
+                .enumerate()
+                .filter_map(move |(r, t)| if d == r { None } else { Some(t.clone()) })
+        })
+        .collect();
+    let transfer_total = Int::add(transfer_terms.as_slice());
+
+    opt.minimize(&empty_cost);
+    opt.minimize(&pair_count);
+    opt.minimize(&transfer_total);
 
     match opt.check(&[]) {
         z3::SatResult::Sat => {
