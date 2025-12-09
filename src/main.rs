@@ -42,6 +42,10 @@ fn main() {
     cans.extend(read_cans_for_size(MSR_227, "227g"));
     cans.extend(read_cans_for_size(MSR_450, "450g"));
 
+    for (idx, can) in cans.iter_mut().enumerate() {
+        can.id = format!("Can #{} ({}g start)", idx + 1, can.gross);
+    }
+
     if cans.is_empty() {
         eprintln!("No cans provided, exiting.");
         return;
@@ -74,8 +78,7 @@ fn read_cans_for_size(spec: CanSpec, prompt_label: &str) -> Vec<Can> {
     }
 
     line.split_whitespace()
-        .enumerate()
-        .map(|(idx, raw)| {
+        .map(|raw| {
             let gross: i32 = raw.parse().expect("invalid integer weight");
             let fuel = gross - spec.empty_weight;
             if fuel < 0 {
@@ -85,7 +88,7 @@ fn read_cans_for_size(spec: CanSpec, prompt_label: &str) -> Vec<Can> {
                 );
             }
             Can {
-                id: format!("{}g start (#{})", gross, idx + 1),
+                id: String::new(),
                 spec,
                 gross,
                 fuel,
