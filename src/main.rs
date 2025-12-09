@@ -25,7 +25,7 @@ const MSR_110: CanSpec = CanSpec {
 const MSR_227: CanSpec = CanSpec {
     name: "MSR 227g",
     capacity: 227,
-    empty_weight: 151,
+    empty_weight: 147,
 };
 const MSR_450: CanSpec = CanSpec {
     name: "MSR 450g",
