@@ -13,6 +13,7 @@ struct CanSpec {
 struct Can {
     id: String,
     spec: CanSpec,
+    gross: i32,
     fuel: i32,
 }
 
@@ -84,8 +85,9 @@ fn read_cans_for_size(spec: CanSpec, prompt_label: &str) -> Vec<Can> {
                 );
             }
             Can {
-                id: format!("{} #{}", prompt_label, idx + 1),
+                id: format!("{}g start (#{})", gross, idx + 1),
                 spec,
+                gross,
                 fuel,
             }
         })
@@ -240,8 +242,13 @@ fn print_plan(cans: &[Can], solution: &Solution) {
         }
         let target_gross = solution.final_fuel[idx] + can.spec.empty_weight;
         println!(
-            "- {} ({}): add {} g -> target fuel {} g (gross {} g)",
-            can.id, can.spec.name, delta, solution.final_fuel[idx], target_gross
+            "- {} ({}): add {} g -> target fuel {} g (gross {} g, start gross {} g)",
+            can.id,
+            can.spec.name,
+            delta,
+            solution.final_fuel[idx],
+            target_gross,
+            can.gross
         );
         let mut donors: Vec<(usize, i32)> = solution
             .transfers
@@ -275,4 +282,19 @@ fn print_plan(cans: &[Can], solution: &Solution) {
         kept_idxs.len(),
         total_gross
     );
+
+    println!("\nFinal fuel per can (including empties):");
+    for (idx, can) in cans.iter().enumerate() {
+        let final_fuel = solution.final_fuel[idx];
+        let final_gross = final_fuel + can.spec.empty_weight;
+        println!(
+            "- {} ({}): start gross {} g, final fuel {} g, final gross {} g{}",
+            can.id,
+            can.spec.name,
+            can.gross,
+            final_fuel,
+            final_gross,
+            if solution.keep[idx] { "" } else { " (left behind)" }
+        );
+    }
 }
