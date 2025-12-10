@@ -312,6 +312,10 @@ function renderGraph(cans, plan) {
     const targetGross = targetFuel + can.spec.emptyWeight;
     detail.textContent = `${can.spec.name} — ${targetGross} g gross`;
     div.append(title, detail);
+    const pct = Math.max(0, Math.min(1, targetFuel / can.spec.capacity));
+    const hue = 120 * pct;
+    div.style.setProperty("--fill-pct", `${(pct * 100).toFixed(1)}%`);
+    div.style.setProperty("--fill-color", `hsl(${hue}, 70%, 55%)`);
     column.appendChild(div);
     return div;
   };
