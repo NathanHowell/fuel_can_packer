@@ -7,6 +7,7 @@ Interactive CLI that uses Z3 to plan how to consolidate MSR fuel canisters to mi
 - Finds an optimal set of cans to carry minimizing empty can weight.
 - Secondary/tertiary objectives: minimize donor→recipient pairings, then total fuel transferred.
 - Prints transfer plan and final fuel/gross weight for every can (including empties left behind).
+- Static webpage uses Z3.wasm (via the `z3-solver` npm package) to compute the same optimal plan in-browser.
 
 ## Usage
 ```bash
@@ -47,7 +48,15 @@ Final fuel per can (including empties):
 - Can #8 (229g start) (MSR 227g): start gross 229 g, final fuel 0 g, final gross 147 g (left behind)
 ```
 
+## Browser UI (Z3.wasm)
+- Inside `web/`: install deps and build the browser bundle (creates `z3-solver-browser.js` and copies Z3 wasm assets):  
+  `cd web && npm install && npm run build`
+- Start the local server that sets COOP/COEP headers (required for Z3’s threaded wasm):  
+  `npm start` then open `http://localhost:3000`
+- Enter space-separated gross weights per size; the page runs the same Z3 optimization in-browser and prints the transfer plan.
+
 ## Notes
 - Input weights must be integers (grams). Values lighter than the empty weight error out.
-- Solver uses Z3 via the `z3` crate; objectives are solved lexicographically.
+- The CLI solver uses Z3 via the `z3` crate; objectives are solved lexicographically.
+- The browser UI uses the `z3-solver` npm package (bundled Z3.wasm) for identical optimization results.
 - Only MSR weights are encoded (from the provided reference table).

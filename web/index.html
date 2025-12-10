@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fuel Can Packer</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card: #161b22;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #61dafb;
+      --danger: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      background: radial-gradient(circle at 10% 20%, rgba(97, 218, 251, 0.12), transparent 25%),
+                  radial-gradient(circle at 80% 0%, rgba(255, 107, 107, 0.15), transparent 30%),
+                  var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 32px 16px;
+    }
+    .shell {
+      width: min(960px, 100%);
+      background: linear-gradient(135deg, rgba(22, 27, 34, 0.92), rgba(22, 27, 34, 0.98));
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 18px;
+      padding: 28px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(6px);
+    }
+    header h1 {
+      margin: 0 0 6px;
+      letter-spacing: -0.02em;
+      font-size: 28px;
+    }
+    header p {
+      margin: 0 0 18px;
+      color: var(--muted);
+    }
+    form {
+      display: grid;
+      gap: 16px;
+    }
+    .inputs {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .field {
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+    input[type="text"] {
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font-size: 14px;
+      padding: 8px 0 2px;
+      outline: none;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+    button {
+      justify-self: start;
+      background: linear-gradient(135deg, #61dafb, #7cf3ff);
+      color: #0d1117;
+      border: none;
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 25px rgba(97, 218, 251, 0.25);
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(97,218,251,0.28); }
+    button:active { transform: translateY(0); box-shadow: 0 10px 25px rgba(97,218,251,0.2); }
+    .output {
+      margin-top: 18px;
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 14px;
+      min-height: 180px;
+      white-space: pre-wrap;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      color: var(--text);
+    }
+    .status {
+      margin: 8px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .error { color: var(--danger); }
+  </style>
+  <script src="./coi-serviceworker.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <h1>Fuel Can Packer</h1>
+      <p>Compute a lighter carry with a simple, offline WebAssembly solver. Enter gross weights in grams for each can size.</p>
+    </header>
+    <form id="pack-form">
+      <div class="inputs">
+        <div class="field">
+          <label for="gross-110">MSR 110g cans</label>
+          <input id="gross-110" type="text" placeholder="e.g. 230 212" autocomplete="off">
+          <div class="hint">Space separated gross weights</div>
+        </div>
+        <div class="field">
+          <label for="gross-227">MSR 227g cans</label>
+          <input id="gross-227" type="text" placeholder="e.g. 380">
+          <div class="hint">Space separated gross weights</div>
+        </div>
+        <div class="field">
+          <label for="gross-450">MSR 450g cans</label>
+          <input id="gross-450" type="text" placeholder="e.g. 720 698">
+          <div class="hint">Space separated gross weights</div>
+        </div>
+      </div>
+      <button type="submit">Compute plan</button>
+      <div class="status" id="status">Ready</div>
+    </form>
+    <pre class="output" id="output">Install frontend deps and build once: npm install && npm run build (run inside web/)</pre>
+  </div>
+  <script src="./z3/z3-built.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
