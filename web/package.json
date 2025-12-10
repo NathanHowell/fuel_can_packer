@@ -4,7 +4,7 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "bundle": "esbuild ./z3-entry.js --bundle --format=esm --platform=browser --define:global=globalThis --outfile=./z3-solver-browser.js",
+    "bundle": "esbuild ./app.js --bundle --format=esm --platform=browser --define:global=globalThis --outfile=./bundle.js",
     "copy-z3": "mkdir -p ./z3 && cp ./node_modules/z3-solver/build/z3-built.{js,wasm} ./z3/",
     "build": "npm run bundle && npm run copy-z3",
     "start": "node ./serve.mjs"
