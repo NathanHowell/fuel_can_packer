@@ -158,6 +158,16 @@
       height: 100%;
       align-items: start;
     }
+    .graph-headers {
+      display: grid;
+      grid-template-columns: 1fr minmax(160px, 0.8fr) 1fr;
+      gap: 12px;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 13px;
+      padding: 0 2px;
+    }
     .node-column {
       display: grid;
       gap: 8px;
@@ -220,11 +230,16 @@
       <button type="submit">Compute plan</button>
       <div class="status" id="status">Ready</div>
     </form>
-  <div class="results">
-    <div class="graph-panel">
-      <div class="graph-grid">
-        <div class="node-column" id="donor-column"></div>
-        <div class="spacer" aria-hidden="true"></div>
+    <div class="results">
+      <div class="graph-panel">
+        <div class="graph-headers">
+          <div>Donors</div>
+          <div aria-hidden="true"></div>
+          <div>Recipients</div>
+        </div>
+        <div class="graph-grid">
+          <div class="node-column" id="donor-column"></div>
+          <div class="spacer" aria-hidden="true"></div>
           <div class="node-column" id="recipient-column"></div>
         </div>
         <svg id="graph-svg"></svg>
