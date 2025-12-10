@@ -37,7 +37,7 @@ async function main() {
   await mkdir(outputDir, { recursive: true });
   
   // Copy static files from current directory
-  const staticFiles = ["index.html", "coi-serviceworker.js"];
+  const staticFiles = ["index.html", "coi-serviceworker.js", "_headers"];
   for (const file of staticFiles) {
     try {
       const dest = join(outputDir, file);
