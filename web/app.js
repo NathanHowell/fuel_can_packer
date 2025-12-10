@@ -287,7 +287,9 @@ function renderGraph(cans, plan) {
   for (let i = 0; i < cans.length; i++) {
     const outgoing = plan.transfers[i].reduce((a, b) => a + b, 0);
     const incoming = plan.transfers.reduce((a, row) => a + row[i], 0);
-    donors.push({ idx: i, total: outgoing });
+    if (!plan.keep[i] || outgoing > 0) {
+      donors.push({ idx: i, total: outgoing });
+    }
     if (plan.keep[i]) {
       recipients.push({ idx: i, total: incoming });
     }
