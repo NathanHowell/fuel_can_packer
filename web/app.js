@@ -17,7 +17,9 @@ function loadZ3() {
 async function ensureCtx() {
   if (z3CtxPromise) return z3CtxPromise;
   z3CtxPromise = (async () => {
-    const { init } = await loadZ3();
+    const mod = await loadZ3();
+    const init = mod.init || (mod.default && mod.default.init);
+    if (!init) throw new Error("Z3 bundle did not export init");
     const { Context } = await init({
       locateFile: (path) => new URL(`./z3/${path}`, import.meta.url).href,
     });
