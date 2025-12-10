@@ -4,9 +4,9 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "bundle": "esbuild ./app.js --bundle --format=esm --platform=browser --define:global=globalThis --splitting --outdir=./dist --entry-names=[name] --chunk-names=chunks/[name]-[hash]",
+    "bundle": "esbuild ./app.js --bundle --format=esm --platform=browser --define:global=globalThis --splitting --outdir=./dist --entry-names=[name] --chunk-names=chunks/[name]-[hash] --metafile=./dist/meta.json",
     "copy-z3": "mkdir -p ./dist/z3 && cp ./node_modules/z3-solver/build/z3-built.{js,wasm} ./dist/z3/",
-    "build": "npm run bundle && npm run copy-z3",
+    "build": "npm run bundle && node ./update-preload.mjs && npm run copy-z3",
     "start": "node ./serve.mjs"
   },
   "keywords": [],
