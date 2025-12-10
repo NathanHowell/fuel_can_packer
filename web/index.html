@@ -68,6 +68,19 @@
       background: rgba(255,255,255,0.01);
       height: 64px;
       counter-increment: can;
+      overflow: hidden;
+    }
+    .cell::after {
+      content: "";
+      position: absolute;
+      inset: 6px;
+      border-radius: 6px;
+      width: var(--fill-pct, 0%);
+      max-width: calc(100% - 12px);
+      background: var(--fill-color, transparent);
+      opacity: 0.28;
+      pointer-events: none;
+      transition: width 120ms ease, background-color 120ms ease, opacity 120ms ease;
     }
     .cell::before {
       content: "#" counter(can);

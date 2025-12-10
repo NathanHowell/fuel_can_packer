@@ -8,6 +8,29 @@ let z3CtxPromise = null;
 let z3ModulePromise = null;
 let z3RuntimePromise = null;
 
+function updateFillIndicator(input) {
+  const cell = input.closest(".cell");
+  if (!cell) return;
+  const raw = input.value.trim();
+  if (!raw) {
+    cell.style.removeProperty("--fill-pct");
+    cell.style.removeProperty("--fill-color");
+    return;
+  }
+  const spec = SPECS.find((s) => s.key === input.dataset.spec);
+  const gross = Number(raw);
+  if (!spec || !Number.isFinite(gross)) {
+    cell.style.removeProperty("--fill-pct");
+    cell.style.removeProperty("--fill-color");
+    return;
+  }
+  const fuel = gross - spec.emptyWeight;
+  const pct = Math.max(0, Math.min(1, fuel / spec.capacity));
+  const hue = 120 * pct; // 0=red, 120=green
+  cell.style.setProperty("--fill-pct", `${(pct * 100).toFixed(1)}%`);
+  cell.style.setProperty("--fill-color", `hsl(${hue}, 70%, 55%)`);
+}
+
 function ensureZ3Runtime() {
   if (globalThis.initZ3) return Promise.resolve();
   if (!z3RuntimePromise) {
@@ -357,6 +380,7 @@ function createInputCell(specKey, idx) {
   input.placeholder = "gross g";
   input.setAttribute("aria-label", `${specKey} can gross weight`);
   cell.append(input);
+  updateFillIndicator(input);
   return cell;
 }
 
@@ -370,9 +394,13 @@ function syncColumn(specKey) {
 
   while (inputs.length < desired) {
     const cell = createInputCell(specKey, inputs.length);
-    cell.querySelector("input").addEventListener("input", () => syncColumn(specKey));
+    const input = cell.querySelector("input");
+    input.addEventListener("input", () => {
+      updateFillIndicator(input);
+      syncColumn(specKey);
+    });
     container.appendChild(cell);
-    inputs.push(cell.querySelector("input"));
+    inputs.push(input);
   }
 
   // Remove extra empties while keeping the trailing spare.
@@ -385,6 +413,8 @@ function syncColumn(specKey) {
     last.parentElement.remove();
     current.pop();
   }
+  // Update indicators in case ordering changed.
+  container.querySelectorAll("input").forEach(updateFillIndicator);
 }
 
 function renderColumns() {
