@@ -49,14 +49,41 @@ Final fuel per can (including empties):
 ```
 
 ## Browser UI (Z3.wasm)
-- Inside `web/`: install deps and build the browser bundle (creates `z3-solver-browser.js` and copies Z3 wasm assets):  
+- Inside `web/`: install deps and build the browser bundle:  
   `cd web && npm install && npm run build`
-- Start the local server that sets COOP/COEP headers (required for Z3’s threaded wasm):  
+- Start the local server that sets COOP/COEP headers (required for Z3's threaded wasm):  
   `npm start` then open `http://localhost:3000`
 - Enter space-separated gross weights per size; the page runs the same Z3 optimization in-browser and prints the transfer plan.
+- The Z3 WebAssembly files are loaded from a CDN (jsDelivr) to avoid the 25 MB file size limit on Cloudflare Pages.
 
 ## Notes
 - Input weights must be integers (grams). Values lighter than the empty weight error out.
 - The CLI solver uses Z3 via the `z3` crate; objectives are solved lexicographically.
-- The browser UI uses the `z3-solver` npm package (bundled Z3.wasm) for identical optimization results.
+- The browser UI uses the `z3-solver` npm package (Z3.wasm loaded from CDN) for identical optimization results.
 - Only MSR weights are encoded (from the provided reference table).
+
+## Cloudflare Pages Deployment
+The application can be deployed to Cloudflare Pages as a static site:
+
+### Automatic Deployment
+- Connect the repository to Cloudflare Pages
+- The build configuration in `wrangler.toml` will automatically:
+  1. Install npm dependencies
+  2. Build the web bundle with esbuild
+  3. Assemble all static files into `web/_site/`
+- The `wrangler.toml` is pre-configured with the correct build command and output directory
+- Z3 WebAssembly files (32 MB) are loaded from jsDelivr CDN to avoid Cloudflare's 25 MB per-file limit
+
+### Manual Deployment
+```bash
+# Install wrangler CLI if not already installed
+npm install -g wrangler
+
+# Build and deploy to Pages
+wrangler pages deploy web/_site
+```
+
+The build process:
+1. Bundles JavaScript with esbuild (code splitting enabled)
+2. Assembles index.html, service worker, and bundled assets into the `web/_site/` directory
+3. Z3 wasm files are loaded from CDN at runtime (not bundled in deployment)

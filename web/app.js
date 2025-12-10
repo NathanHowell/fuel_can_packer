@@ -36,10 +36,10 @@ function ensureZ3Runtime() {
   if (!z3RuntimePromise) {
     z3RuntimePromise = new Promise((resolve, reject) => {
       const script = document.createElement("script");
-      script.src = new URL("./z3/z3-built.js", import.meta.url).href;
+      script.src = "https://cdn.jsdelivr.net/npm/z3-solver@4.15.4/build/z3-built.js";
       script.async = true;
       script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Failed to load z3-built.js"));
+      script.onerror = () => reject(new Error("Failed to load z3-built.js from CDN"));
       document.head.appendChild(script);
     });
   }
@@ -63,7 +63,7 @@ async function ensureCtx() {
     const init = mod.init || (mod.default && mod.default.init);
     if (!init) throw new Error("Z3 bundle did not export init");
     const { Context } = await init({
-      locateFile: (path) => new URL(`./z3/${path}`, import.meta.url).href,
+      locateFile: (path) => `https://cdn.jsdelivr.net/npm/z3-solver@4.15.4/build/${path}`,
     });
     return new Context("fuel-can");
   })();
