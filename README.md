@@ -62,11 +62,11 @@ Final fuel per can (including empties):
 - The browser UI uses the `z3-solver` npm package (Z3.wasm loaded from CDN) for identical optimization results.
 - Only MSR weights are encoded (from the provided reference table).
 
-## Cloudflare Pages Deployment
-The application can be deployed to Cloudflare Pages as a static site:
+## Cloudflare Workers Deployment
+The application can be deployed to Cloudflare Workers as a static site:
 
 ### Automatic Deployment
-- Connect the repository to Cloudflare Pages
+- Connect the repository to Cloudflare Workers via CI/CD
 - The build configuration in `wrangler.toml` will automatically:
   1. Install npm dependencies
   2. Build the web bundle with esbuild
@@ -79,8 +79,8 @@ The application can be deployed to Cloudflare Pages as a static site:
 # Install wrangler CLI if not already installed
 npm install -g wrangler
 
-# Build and deploy to Pages
-wrangler pages deploy web/_site
+# Build and deploy to Workers
+wrangler deploy
 ```
 
 The build process:
