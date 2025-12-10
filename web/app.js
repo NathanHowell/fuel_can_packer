@@ -1,10 +1,10 @@
 import { init } from "./z3-solver-browser.js";
 
-const SPECS = {
-  msr110: { name: "MSR 110g", capacity: 110, emptyWeight: 101 },
-  msr227: { name: "MSR 227g", capacity: 227, emptyWeight: 147 },
-  msr450: { name: "MSR 450g", capacity: 450, emptyWeight: 216 },
-};
+const SPECS = [
+  { key: "msr110", name: "MSR 110g", capacity: 110, emptyWeight: 101 },
+  { key: "msr227", name: "MSR 227g", capacity: 227, emptyWeight: 147 },
+  { key: "msr450", name: "MSR 450g", capacity: 450, emptyWeight: 216 },
+];
 
 let z3CtxPromise = null;
 
@@ -17,25 +17,10 @@ async function ensureCtx() {
   return z3CtxPromise;
 }
 
-function parseLine(raw) {
-  if (!raw.trim()) return [];
-  return raw
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((v) => {
-      const n = Number(v);
-      if (!Number.isFinite(n)) {
-        throw new Error(`Invalid number "${v}"`);
-      }
-      return Math.round(n);
-    });
-}
-
 function buildCans(payload) {
   const cans = [];
   const push = (specKey, grossList) => {
-    const spec = SPECS[specKey];
+    const spec = SPECS.find((s) => s.key === specKey);
     grossList.forEach((gross) => {
       const fuel = gross - spec.emptyWeight;
       if (fuel < 0) {
@@ -227,6 +212,96 @@ function formatPlan(cans, plan) {
   return out;
 }
 
+function renderGraph(cans, plan) {
+  const donorCol = document.getElementById("donor-column");
+  const recipCol = document.getElementById("recipient-column");
+  const svg = document.getElementById("graph-svg");
+  donorCol.innerHTML = "";
+  recipCol.innerHTML = "";
+  svg.innerHTML = "";
+  if (!plan) return;
+
+  const panelRect = svg.parentElement.getBoundingClientRect();
+  const donorRect = donorCol.getBoundingClientRect();
+  const recipRect = recipCol.getBoundingClientRect();
+  const donorX = donorRect.right - panelRect.left - 8;
+  const recipX = recipRect.left - panelRect.left + 8;
+
+  const donors = [];
+  const recipients = [];
+  const edges = [];
+
+  for (let i = 0; i < cans.length; i++) {
+    const outgoing = plan.transfers[i].reduce((a, b) => a + b, 0);
+    const incoming = plan.transfers.reduce((a, row) => a + row[i], 0);
+    if (outgoing > 0) {
+      donors.push({ idx: i, total: outgoing });
+    }
+    if (plan.keep[i] && incoming > 0) {
+      recipients.push({ idx: i, total: incoming });
+    }
+    for (let j = 0; j < cans.length; j++) {
+      const amt = plan.transfers[i][j];
+      if (amt > 0) edges.push({ from: i, to: j, amt });
+    }
+  }
+
+  const makeNode = (node, column) => {
+    const div = document.createElement("div");
+    div.className = "node";
+    div.dataset.idx = String(node.idx);
+    const can = cans[node.idx];
+    const title = document.createElement("strong");
+    title.textContent = can.id;
+    const detail = document.createElement("div");
+    detail.className = "muted";
+    const targetFuel = plan.final_fuel[node.idx];
+    const targetGross = targetFuel + can.spec.emptyWeight;
+    detail.textContent = `${can.spec.name} — ${targetGross} g gross`;
+    div.append(title, detail);
+    column.appendChild(div);
+    return div;
+  };
+
+  const donorEls = donors.map((d) => makeNode(d, donorCol));
+  const recipEls = recipients.map((r) => makeNode(r, recipCol));
+  if (edges.length === 0) return;
+
+  const centers = new Map();
+  [...donorEls, ...recipEls].forEach((el) => {
+    const r = el.getBoundingClientRect();
+    centers.set(Number(el.dataset.idx), {
+      x: r.left + r.width / 2 - panelRect.left,
+      y: r.top + r.height / 2 - panelRect.top,
+    });
+  });
+
+  svg.setAttribute("width", panelRect.width);
+  svg.setAttribute("height", panelRect.height);
+
+  edges.forEach((edge) => {
+    if (!centers.has(edge.from) || !centers.has(edge.to)) return;
+    const a = centers.get(edge.from);
+    const b = centers.get(edge.to);
+    const x1 = donorX;
+    const x2 = recipX;
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", x1);
+    line.setAttribute("y1", a.y);
+    line.setAttribute("x2", x2);
+    line.setAttribute("y2", b.y);
+    line.setAttribute("class", "edge");
+    svg.appendChild(line);
+
+    const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    label.setAttribute("x", (x1 + x2) / 2);
+    label.setAttribute("y", (a.y + b.y) / 2 - 4);
+    label.setAttribute("class", "edge-label");
+    label.textContent = `${edge.amt} g`;
+    svg.appendChild(label);
+  });
+}
+
 async function compute(payload) {
   const cans = buildCans(payload);
   assignIds(cans);
@@ -236,8 +311,91 @@ async function compute(payload) {
     );
   }
   const plan = await solveWithZ3(cans);
-  return formatPlan(cans, plan);
+  return { plan, cans };
 }
+
+function createInputCell(specKey, idx) {
+  const cell = document.createElement("div");
+  cell.className = "cell";
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = "0";
+  input.inputMode = "numeric";
+  input.id = `${specKey}-${idx}`;
+  input.className = "can-input";
+  input.dataset.spec = specKey;
+  input.placeholder = "gross g";
+  input.setAttribute("aria-label", `${specKey} can gross weight`);
+  cell.append(input);
+  return cell;
+}
+
+function syncColumn(specKey) {
+  const container = document.querySelector(`[data-column="${specKey}"] .cells`);
+  const inputs = Array.from(
+    container.querySelectorAll('input[type="number"][data-spec]')
+  );
+  const filled = inputs.filter((input) => input.value.trim() !== "");
+  const desired = filled.length + 1;
+
+  while (inputs.length < desired) {
+    const cell = createInputCell(specKey, inputs.length);
+    cell.querySelector("input").addEventListener("input", () => syncColumn(specKey));
+    container.appendChild(cell);
+    inputs.push(cell.querySelector("input"));
+  }
+
+  // Remove extra empties while keeping the trailing spare.
+  let current = Array.from(
+    container.querySelectorAll('input[type="number"][data-spec]')
+  );
+  while (current.length > desired) {
+    const last = current[current.length - 1];
+    if (last.value.trim() !== "") break;
+    last.parentElement.remove();
+    current.pop();
+  }
+}
+
+function renderColumns() {
+  const colWrap = document.getElementById("columns");
+  SPECS.forEach((spec) => {
+    const col = document.createElement("section");
+    col.className = "column";
+    col.dataset.column = spec.key;
+
+    const title = document.createElement("h2");
+    title.textContent = spec.name;
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent = `Capacity ${spec.capacity} g, empty ${spec.emptyWeight} g`;
+
+    const cells = document.createElement("div");
+    cells.className = "cells";
+    col.append(title, hint, cells);
+    colWrap.appendChild(col);
+    syncColumn(spec.key);
+  });
+}
+
+function readPayload() {
+  const payload = { msr_110: [], msr_227: [], msr_450: [] };
+  document.querySelectorAll(".can-input").forEach((input) => {
+    const value = input.value.trim();
+    if (!value) return;
+    const n = Number(value);
+    if (!Number.isFinite(n)) {
+      throw new Error(`Invalid number "${value}"`);
+    }
+    const rounded = Math.round(n);
+    if (input.dataset.spec === "msr110") payload.msr_110.push(rounded);
+    if (input.dataset.spec === "msr227") payload.msr_227.push(rounded);
+    if (input.dataset.spec === "msr450") payload.msr_450.push(rounded);
+  });
+  return payload;
+}
+
+renderColumns();
 
 const statusEl = document.getElementById("status");
 const outputEl = document.getElementById("output");
@@ -249,13 +407,10 @@ form.addEventListener("submit", async (event) => {
   outputEl.classList.remove("error");
   statusEl.textContent = "Loading Z3…";
   try {
-    const payload = {
-      msr_110: parseLine(document.getElementById("gross-110").value),
-      msr_227: parseLine(document.getElementById("gross-227").value),
-      msr_450: parseLine(document.getElementById("gross-450").value),
-    };
-    const result = await compute(payload);
-    outputEl.textContent = result;
+    const payload = readPayload();
+    const { plan, cans } = await compute(payload);
+    outputEl.textContent = formatPlan(cans, plan);
+    renderGraph(cans, plan);
     statusEl.textContent = "Plan ready";
   } catch (err) {
     statusEl.textContent = "Error";

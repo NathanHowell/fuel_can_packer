@@ -6,98 +6,114 @@
   <title>Fuel Can Packer</title>
   <style>
     :root {
-      --bg: #0d1117;
-      --card: #161b22;
-      --text: #e6edf3;
-      --muted: #8b949e;
-      --accent: #61dafb;
-      --danger: #ff6b6b;
+      color-scheme: dark;
+      --bg: #0b0c0f;
+      --panel: #151821;
+      --border: #272b36;
+      --text: #e8ecf2;
+      --muted: #9aa0ab;
+      --accent: #7cdfff;
+      --focus: #d4e7ff;
+      --danger: #ff7b7b;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100vh;
       font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-      background: radial-gradient(circle at 10% 20%, rgba(97, 218, 251, 0.12), transparent 25%),
-                  radial-gradient(circle at 80% 0%, rgba(255, 107, 107, 0.15), transparent 30%),
+      background: radial-gradient(circle at 12% 18%, rgba(124, 223, 255, 0.12), transparent 24%),
+                  radial-gradient(circle at 80% 10%, rgba(255, 123, 123, 0.12), transparent 28%),
                   var(--bg);
       color: var(--text);
       display: flex;
       justify-content: center;
-      padding: 32px 16px;
+      padding: 32px 16px 48px;
     }
     .shell {
-      width: min(960px, 100%);
-      background: linear-gradient(135deg, rgba(22, 27, 34, 0.92), rgba(22, 27, 34, 0.98));
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 18px;
-      padding: 28px;
-      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
-      backdrop-filter: blur(6px);
+      width: min(1100px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
     }
-    header h1 {
-      margin: 0 0 6px;
-      letter-spacing: -0.02em;
-      font-size: 28px;
-    }
-    header p {
-      margin: 0 0 18px;
-      color: var(--muted);
-    }
-    form {
+    header h1 { margin: 0 0 6px; letter-spacing: -0.02em; }
+    header p { margin: 0 0 20px; color: var(--muted); }
+    form { display: grid; gap: 16px; }
+    .columns {
       display: grid;
-      gap: 16px;
-    }
-    .inputs {
-      display: grid;
-      gap: 12px;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      counter-reset: can;
     }
-    label {
-      display: block;
+    .column {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+      align-content: start;
+    }
+    .column h2 { margin: 0; font-size: 16px; }
+    .hint { color: var(--muted); font-size: 13px; margin: 0; }
+    .cells { display: grid; gap: 8px; align-content: start; }
+    .cell {
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding: 8px 12px 8px 42px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.01);
+      height: 64px;
+      counter-increment: can;
+    }
+    .cell::before {
+      content: "#" counter(can);
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 13px;
       font-weight: 600;
-      margin-bottom: 6px;
-      color: var(--text);
     }
-    .field {
-      background: var(--card);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      padding: 16px;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    }
-    input[type="text"] {
+    .cell:has(input:placeholder-shown) { counter-increment: none; }
+    .cell:has(input:placeholder-shown)::before { content: ""; }
+    .cell label { display: none; }
+    .cell input {
       width: 100%;
       border: none;
       background: transparent;
       color: var(--text);
-      font-size: 14px;
-      padding: 8px 0 2px;
+      font-size: 15px;
+      padding: 4px 0;
       outline: none;
     }
-    .hint {
-      color: var(--muted);
-      font-size: 13px;
-      margin-top: 6px;
+    .cell input:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 6px;
     }
     button {
       justify-self: start;
-      background: linear-gradient(135deg, #61dafb, #7cf3ff);
-      color: #0d1117;
-      border: none;
+      background: var(--accent);
+      color: #061018;
+      border: 1px solid rgba(255,255,255,0.08);
       border-radius: 999px;
       padding: 10px 18px;
       font-weight: 700;
       cursor: pointer;
-      box-shadow: 0 10px 25px rgba(97, 218, 251, 0.25);
+      box-shadow: 0 12px 28px rgba(124, 223, 255, 0.28);
       transition: transform 120ms ease, box-shadow 120ms ease;
     }
-    button:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(97,218,251,0.28); }
-    button:active { transform: translateY(0); box-shadow: 0 10px 25px rgba(97,218,251,0.2); }
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); box-shadow: 0 10px 24px rgba(124,223,255,0.2); }
     .output {
-      margin-top: 18px;
-      background: var(--card);
-      border: 1px solid rgba(255, 255, 255, 0.05);
+      margin-top: 8px;
+      background: #0f1119;
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 14px;
       min-height: 180px;
@@ -105,12 +121,64 @@
       font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
       color: var(--text);
     }
-    .status {
-      margin: 8px 0 0;
-      font-size: 13px;
-      color: var(--muted);
-    }
+    .status { margin: 0; font-size: 13px; color: var(--muted); }
     .error { color: var(--danger); }
+    .results {
+      margin-top: 8px;
+      display: grid;
+      gap: 12px;
+    }
+    .graph-panel {
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      background: #0f1119;
+      min-height: 240px;
+      overflow: hidden;
+    }
+    .graph-grid {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr minmax(160px, 0.8fr) 1fr;
+      gap: 12px;
+      height: 100%;
+      align-items: start;
+    }
+    .node-column {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+    .spacer {
+      position: relative;
+      min-height: 160px;
+    }
+    .node {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(255,255,255,0.02);
+      display: grid;
+      gap: 4px;
+    }
+    .node strong { font-size: 14px; }
+    .node .muted { color: var(--muted); font-size: 13px; }
+    .graph-panel svg {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .edge {
+      stroke: var(--accent);
+      stroke-width: 2;
+      stroke-opacity: 0.6;
+    }
+    .edge-label {
+      fill: var(--muted);
+      font-size: 12px;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    }
   </style>
   <script src="./coi-serviceworker.js"></script>
 </head>
@@ -118,30 +186,24 @@
   <div class="shell">
     <header>
       <h1>Fuel Can Packer</h1>
-      <p>Compute a lighter carry with a simple, offline WebAssembly solver. Enter gross weights in grams for each can size.</p>
+      <p>Compute a lighter carry with a lean, offline solver. Enter a gross weight (grams) in each row; there is always one spare row to keep things simple.</p>
     </header>
     <form id="pack-form">
-      <div class="inputs">
-        <div class="field">
-          <label for="gross-110">MSR 110g cans</label>
-          <input id="gross-110" type="text" placeholder="e.g. 230 212" autocomplete="off">
-          <div class="hint">Space separated gross weights</div>
-        </div>
-        <div class="field">
-          <label for="gross-227">MSR 227g cans</label>
-          <input id="gross-227" type="text" placeholder="e.g. 380">
-          <div class="hint">Space separated gross weights</div>
-        </div>
-        <div class="field">
-          <label for="gross-450">MSR 450g cans</label>
-          <input id="gross-450" type="text" placeholder="e.g. 720 698">
-          <div class="hint">Space separated gross weights</div>
-        </div>
-      </div>
+      <div class="columns" id="columns"></div>
       <button type="submit">Compute plan</button>
       <div class="status" id="status">Ready</div>
     </form>
-    <pre class="output" id="output">Install frontend deps and build once: npm install && npm run build (run inside web/)</pre>
+    <div class="results">
+      <div class="graph-panel">
+        <div class="graph-grid">
+          <div class="node-column" id="donor-column"></div>
+          <div class="spacer" aria-hidden="true"></div>
+          <div class="node-column" id="recipient-column"></div>
+        </div>
+        <svg id="graph-svg"></svg>
+      </div>
+      <pre class="output" id="output">Install frontend deps and build once: npm install && npm run build (run inside web/)</pre>
+    </div>
   </div>
   <script src="./z3/z3-built.js"></script>
   <script type="module" src="./app.js"></script>
