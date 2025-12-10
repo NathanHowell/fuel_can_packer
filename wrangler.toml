@@ -6,5 +6,5 @@ pages_build_output_dir = "web/_site"
 [build]
 command = "cd web && npm ci && npm run build:deploy"
 
-[[build.watch_dirs]]
-path = "web"
+[assets]
+directory = "web/_site"
