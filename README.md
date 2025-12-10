@@ -60,3 +60,29 @@ Final fuel per can (including empties):
 - The CLI solver uses Z3 via the `z3` crate; objectives are solved lexicographically.
 - The browser UI uses the `z3-solver` npm package (bundled Z3.wasm) for identical optimization results.
 - Only MSR weights are encoded (from the provided reference table).
+
+## Cloudflare Pages Deployment
+The application can be deployed to Cloudflare Pages as a static site:
+
+### Automatic Deployment
+- Connect the repository to Cloudflare Pages
+- The build configuration in `wrangler.toml` will automatically:
+  1. Install npm dependencies
+  2. Build the web bundle with esbuild
+  3. Copy Z3 wasm files
+  4. Assemble all static files into `web/_site/`
+- The `wrangler.toml` is pre-configured with the correct build command and output directory
+
+### Manual Deployment
+```bash
+# Install wrangler CLI if not already installed
+npm install -g wrangler
+
+# Build and deploy
+wrangler pages deploy
+```
+
+The build process:
+1. Bundles JavaScript with esbuild (code splitting enabled)
+2. Copies Z3 WebAssembly files from the z3-solver package
+3. Assembles index.html, service worker, and all assets into the `web/_site/` directory
