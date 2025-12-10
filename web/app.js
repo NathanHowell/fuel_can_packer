@@ -6,10 +6,29 @@ const SPECS = [
 
 let z3CtxPromise = null;
 let z3ModulePromise = null;
+let z3RuntimePromise = null;
+
+function ensureZ3Runtime() {
+  if (globalThis.initZ3) return Promise.resolve();
+  if (!z3RuntimePromise) {
+    z3RuntimePromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = new URL("./z3/z3-built.js", import.meta.url).href;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load z3-built.js"));
+      document.head.appendChild(script);
+    });
+  }
+  return z3RuntimePromise;
+}
 
 function loadZ3() {
   if (!z3ModulePromise) {
-    z3ModulePromise = import("z3-solver");
+    z3ModulePromise = (async () => {
+      await ensureZ3Runtime();
+      return import("z3-solver");
+    })();
   }
   return z3ModulePromise;
 }
