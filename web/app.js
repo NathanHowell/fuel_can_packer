@@ -1,5 +1,3 @@
-import { init } from "./z3-solver-browser.js";
-
 const SPECS = [
   { key: "msr110", name: "MSR 110g", capacity: 110, emptyWeight: 101 },
   { key: "msr227", name: "MSR 227g", capacity: 227, emptyWeight: 147 },
@@ -7,11 +5,22 @@ const SPECS = [
 ];
 
 let z3CtxPromise = null;
+let z3ModulePromise = null;
+
+function loadZ3() {
+  if (!z3ModulePromise) {
+    z3ModulePromise = import("z3-solver");
+  }
+  return z3ModulePromise;
+}
 
 async function ensureCtx() {
   if (z3CtxPromise) return z3CtxPromise;
   z3CtxPromise = (async () => {
-    const { Context } = await init();
+    const { init } = await loadZ3();
+    const { Context } = await init({
+      locateFile: (path) => new URL(`./z3/${path}`, import.meta.url).href,
+    });
     return new Context("fuel-can");
   })();
   return z3CtxPromise;
@@ -396,6 +405,13 @@ function readPayload() {
 }
 
 renderColumns();
+// Warm up the solver after initial render without blocking input.
+const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 500));
+idle(() => {
+  ensureCtx().catch(() => {
+    /* ignore warmup errors; surfaced on submit */
+  });
+});
 
 const statusEl = document.getElementById("status");
 const outputEl = document.getElementById("output");
