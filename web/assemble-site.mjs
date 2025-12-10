@@ -39,14 +39,23 @@ async function main() {
   // Copy static files from current directory
   const staticFiles = ["index.html", "coi-serviceworker.js"];
   for (const file of staticFiles) {
-    const dest = join(outputDir, file);
-    await copyFile(file, dest);
-    console.log(`Copied ${file}`);
+    try {
+      const dest = join(outputDir, file);
+      await copyFile(file, dest);
+      console.log(`Copied ${file}`);
+    } catch (err) {
+      console.error(`Warning: Failed to copy ${file}: ${err.message}`);
+      process.exit(1);
+    }
   }
   
   // Copy dist directory
   const distSrc = "dist";
   const distDest = join(outputDir, "dist");
+  if (!(await exists(distSrc))) {
+    console.error("Error: dist directory not found. Run 'npm run build' first.");
+    process.exit(1);
+  }
   await copyRecursive(distSrc, distDest);
   console.log("Copied dist/");
   
