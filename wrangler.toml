@@ -1,6 +1,5 @@
 name = "fuel-can-packer"
 compatibility_date = "2024-12-10"
-main = "web/_site/index.html"
 
 [build]
 command = "cd web && npm ci && npm run build:deploy"
