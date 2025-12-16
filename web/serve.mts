@@ -20,7 +20,7 @@ const mime: Record<string, string> = {
 
 const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
   try {
-    const host = req.headers["host"];
+    const host = req.headers.host;
     if (!host || !req.url) {
       res.writeHead(400);
       res.end("Bad request");

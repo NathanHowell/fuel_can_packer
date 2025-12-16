@@ -63,7 +63,7 @@ const SPECS: readonly CanSpec[] = [
 // Utilities
 function lexLess(a: Score, b: Score): boolean {
   for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return a[i]! < b[i]!;
+    if (a[i] !== b[i]) {return a[i]! < b[i]!;}
   }
   return false;
 }
@@ -81,8 +81,8 @@ function allocateMinEdgesAndMinTransfer(
 
   const totalNeed = donors.reduce((a, d) => a + d.amt, 0);
   const totalCap = recipients.reduce((a, r) => a + r.cap, 0);
-  if (totalNeed === 0) return { edges: [], pairCount: 0, transferTotal: 0 };
-  if (totalNeed > totalCap) return null;
+  if (totalNeed === 0) {return { edges: [], pairCount: 0, transferTotal: 0 };}
+  if (totalNeed > totalCap) {return null;}
 
   donors = donors.slice().sort((a, b) => b.amt - a.amt);
   recipients = recipients.slice().sort((a, b) => b.cap - a.cap);
@@ -102,7 +102,7 @@ function allocateMinEdgesAndMinTransfer(
             break;
           }
         }
-        if (best < 0) return null;
+        if (best < 0) {return null;}
         const take = Math.min(left, caps[best]!);
         edges.push({ from: d.from, to: recipients[best]!.to, amt: take });
         caps[best]! -= take;
@@ -114,7 +114,7 @@ function allocateMinEdgesAndMinTransfer(
     return { edges, pairCount, transferTotal };
   })();
 
-  if (!greedy) return null;
+  if (!greedy) {return null;}
 
   const edgesLB = donors.length;
   const edgesUB = Math.min(
@@ -129,7 +129,7 @@ function allocateMinEdgesAndMinTransfer(
   function sumTopCaps(caps: readonly number[], k: number): number {
     const tmp = caps.filter((c) => c > 0).sort((a, b) => b - a);
     let s = 0;
-    for (let i = 0; i < Math.min(k, tmp.length); i++) s += tmp[i]!;
+    for (let i = 0; i < Math.min(k, tmp.length); i++) {s += tmp[i]!;}
     return s;
   }
 
@@ -139,9 +139,9 @@ function allocateMinEdgesAndMinTransfer(
     caps: readonly number[],
     memo: Map<string, number>
   ): readonly Edge[] | null {
-    if (dIdx === donors.length) return [];
+    if (dIdx === donors.length) {return [];}
     const memoKey = keyOf(dIdx, edgesLeft, caps);
-    if (memo.has(memoKey)) return null;
+    if (memo.has(memoKey)) {return null;}
 
     const remainingDonors = donors.length - dIdx;
     if (edgesLeft < remainingDonors) {
@@ -171,25 +171,25 @@ function allocateMinEdgesAndMinTransfer(
     const minPiecesHere = Math.max(1, Math.ceil(need / Math.max(1, maxCapNow)));
 
     for (let pieces = minPiecesHere; pieces <= maxPiecesHere; pieces++) {
-      if (sumTopCaps(caps, pieces) < need) continue;
+      if (sumTopCaps(caps, pieces) < need) {continue;}
 
       const candIdxs: number[] = [];
-      for (let i = 0; i < R; i++) if (caps[i]! > 0) candIdxs.push(i);
+      for (let i = 0; i < R; i++) {if (caps[i]! > 0) {candIdxs.push(i);}}
 
       const combo: number[] = new Array(pieces);
 
       function chooseCombo(pos: number, start: number): readonly Edge[] | null {
         if (pos === pieces) {
           let sum = 0;
-          for (let k = 0; k < pieces; k++) sum += caps[combo[k]!]!;
-          if (sum < need) return null;
+          for (let k = 0; k < pieces; k++) {sum += caps[combo[k]!]!;}
+          if (sum < need) {return null;}
 
           const assigns: number[] = new Array(pieces).fill(0);
 
           function assignAmounts(p: number, left: number): boolean {
             if (p === pieces - 1) {
               const idx = combo[p]!;
-              if (left < 1 || left > caps[idx]!) return false;
+              if (left < 1 || left > caps[idx]!) {return false;}
               assigns[p] = left;
               return true;
             }
@@ -197,20 +197,20 @@ function allocateMinEdgesAndMinTransfer(
             const capHere = caps[idx]!;
 
             let restMax = 0;
-            for (let q = p + 1; q < pieces; q++) restMax += caps[combo[q]!]!;
+            for (let q = p + 1; q < pieces; q++) {restMax += caps[combo[q]!]!;}
 
             const minHere = Math.max(1, left - restMax);
             const maxHere = Math.min(capHere, left - (pieces - p - 1));
-            if (minHere > maxHere) return false;
+            if (minHere > maxHere) {return false;}
 
             for (let x = maxHere; x >= minHere; x--) {
               assigns[p] = x;
-              if (assignAmounts(p + 1, left - x)) return true;
+              if (assignAmounts(p + 1, left - x)) {return true;}
             }
             return false;
           }
 
-          if (!assignAmounts(0, need)) return null;
+          if (!assignAmounts(0, need)) {return null;}
 
           const nextCaps = caps.slice();
           const edgeList: Edge[] = [];
@@ -222,20 +222,20 @@ function allocateMinEdgesAndMinTransfer(
           }
 
           const tail = dfs(dIdx + 1, edgesLeft - pieces, nextCaps, memo);
-          if (!tail) return null;
+          if (!tail) {return null;}
           return [...edgeList, ...tail];
         }
 
         for (let i = start; i <= candIdxs.length - (pieces - pos); i++) {
           combo[pos] = candIdxs[i]!;
           const res = chooseCombo(pos + 1, i + 1);
-          if (res) return res;
+          if (res) {return res;}
         }
         return null;
       }
 
       const res = chooseCombo(0, 0);
-      if (res) return res;
+      if (res) {return res;}
     }
 
     memo.set(memoKey, 1);
@@ -266,8 +266,8 @@ function allocateMinEdgesAndMinTransfer(
 }
 
 async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
-  if (!cans.length) throw new Error("No cans provided");
-  if (cans.length > 16) throw new Error("Pure-JS solver supports up to 16 cans");
+  if (!cans.length) {throw new Error("No cans provided");}
+  if (cans.length > 16) {throw new Error("Pure-JS solver supports up to 16 cans");}
 
   const n = cans.length;
   const caps = cans.map((c) => c.spec.capacity);
@@ -295,39 +295,39 @@ async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
         emptyCost += empties[i]!;
       }
     }
-    if (capSum < totalFuel) continue;
+    if (capSum < totalFuel) {continue;}
 
     const keep: boolean[] = Array(n).fill(false);
-    for (let i = 0; i < n; i++) keep[i] = !!(mask & (1 << i));
+    for (let i = 0; i < n; i++) {keep[i] = !!(mask & (1 << i));}
 
     const baseline: number[] = Array(n).fill(0);
     const slack: Recipient[] = [];
     for (let i = 0; i < n; i++) {
-      if (!keep[i]) continue;
+      if (!keep[i]) {continue;}
       baseline[i] = Math.min(init[i]!, caps[i]!);
       const s = caps[i]! - baseline[i]!;
-      if (s > 0) slack.push({ to: i, cap: s });
+      if (s > 0) {slack.push({ to: i, cap: s });}
     }
 
     const donors: Donor[] = [];
     for (let i = 0; i < n; i++) {
       if (!keep[i]) {
-        if (init[i]! > 0) donors.push({ from: i, amt: init[i]! });
+        if (init[i]! > 0) {donors.push({ from: i, amt: init[i]! });}
       } else {
         const excess = Math.max(0, init[i]! - caps[i]!);
-        if (excess > 0) donors.push({ from: i, amt: excess });
+        if (excess > 0) {donors.push({ from: i, amt: excess });}
       }
     }
 
     const alloc = allocateMinEdgesAndMinTransfer(donors, slack);
-    if (!alloc) continue;
+    if (!alloc) {continue;}
 
     const transfers: number[][] = zeros2(n);
-    for (const e of alloc.edges) transfers[e.from]![e.to]! += e.amt;
+    for (const e of alloc.edges) {transfers[e.from]![e.to]! += e.amt;}
 
     const finalFuel: number[] = Array(n).fill(0);
-    for (let i = 0; i < n; i++) finalFuel[i] = keep[i] ? baseline[i]! : 0;
-    for (const e of alloc.edges) finalFuel[e.to]! += e.amt;
+    for (let i = 0; i < n; i++) {finalFuel[i] = keep[i] ? baseline[i]! : 0;}
+    for (const e of alloc.edges) {finalFuel[e.to]! += e.amt;}
 
     for (let i = 0; i < n; i++) {
       if (!keep[i] && finalFuel[i] !== 0) {
@@ -337,10 +337,10 @@ async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
         throw new Error("internal: capacity violation");
       }
       const out = transfers[i]!.reduce((a, b) => a + b, 0);
-      if (out > init[i]!) throw new Error("internal: outflow > initial fuel");
+      if (out > init[i]!) {throw new Error("internal: outflow > initial fuel");}
     }
     const sumFinal = finalFuel.reduce((a, b) => a + b, 0);
-    if (sumFinal !== totalFuel) throw new Error("internal: fuel not conserved");
+    if (sumFinal !== totalFuel) {throw new Error("internal: fuel not conserved");}
 
     const score: Score = [emptyCost, alloc.pairCount, alloc.transferTotal];
     if (!best || lexLess(score, best.score)) {
@@ -351,18 +351,8 @@ async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
     }
   }
 
-  if (!best) throw new Error("No feasible plan found");
+  if (!best) {throw new Error("No feasible plan found");}
   return best.plan;
-}
-
-function buildCans(specs: readonly { spec_key: string; fuel: number; gross: number }[]): Can[] {
-  const out: Can[] = [];
-  for (const c of specs) {
-    const spec = SPECS.find((s) => s.key === c.spec_key);
-    if (!spec) throw new Error(`Unknown spec: ${c.spec_key}`);
-    out.push({ id: -1, spec, fuel: c.fuel, gross: c.gross });
-  }
-  return out;
 }
 
 function assignIds(cans: Can[]): void {
@@ -410,8 +400,8 @@ function initializeColumns(): void {
 }
 
 function addCell(specKey: string): void {
-  const cellsContainer = columnsEl.querySelector(`.cells[data-spec="${specKey}"]`) as HTMLDivElement;
-  if (!cellsContainer) return;
+  const cellsContainer = columnsEl.querySelector(`.cells[data-spec="${specKey}"]`)!;
+  if (!cellsContainer) {return;}
 
   const cell = document.createElement("div");
   cell.className = "cell";
@@ -428,10 +418,11 @@ function addCell(specKey: string): void {
     if (input.value && !input.placeholder) {
       const cells = cellsContainer.querySelectorAll(".cell");
       const lastCell = cells[cells.length - 1];
-      const lastInput = lastCell?.querySelector("input") as HTMLInputElement;
-
-      if (lastInput && lastInput.value) {
-        addCell(specKey);
+      if (lastCell) {
+        const lastInput = lastCell.querySelector("input");
+        if (lastInput && lastInput.value) {
+          addCell(specKey);
+        }
       }
     }
 
@@ -445,7 +436,7 @@ function addCell(specKey: string): void {
 function updateCellFill(cell: HTMLDivElement, input: HTMLInputElement): void {
   const specKey = input.name.split("_")[1];
   const spec = SPECS.find((s) => s.key === specKey);
-  if (!spec) return;
+  if (!spec) {return;}
 
   const gross = parseFloat(input.value) || 0;
   const fuel = Math.max(0, gross - spec.emptyWeight);
@@ -462,7 +453,7 @@ formEl.addEventListener("submit", async (e: Event) => {
   const cans: Can[] = [];
 
   for (const spec of SPECS) {
-    const cells = columnsEl.querySelectorAll(`.cells[data-spec="${spec.key}"] input`) as NodeListOf<HTMLInputElement>;
+    const cells = columnsEl.querySelectorAll<HTMLInputElement>(`.cells[data-spec="${spec.key}"] input`);
 
     for (const input of Array.from(cells)) {
       const gross = parseFloat(input.value);
@@ -495,7 +486,7 @@ formEl.addEventListener("submit", async (e: Event) => {
     // Show results using CSS data attribute
     resultsEl.setAttribute("data-visible", "true");
     statusEl.textContent = "Complete";
-  } catch (err) {
+  } catch (err: unknown) {
     statusEl.textContent = `Error: ${err instanceof Error ? err.message : String(err)}`;
     statusEl.classList.add("error");
   }
@@ -569,12 +560,12 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
   for (let i = 0; i < cans.length; i++) {
     for (let j = 0; j < cans.length; j++) {
       const amt = plan.transfers[i]![j]!;
-      if (amt <= 0) continue;
+      if (amt <= 0) {continue;}
 
-      const fromNode = donorColumnEl.querySelector(`[data-can-id="${i}"]`) as HTMLElement;
-      const toNode = recipientColumnEl.querySelector(`[data-can-id="${j}"]`) as HTMLElement;
+      const fromNode = donorColumnEl.querySelector(`[data-can-id="${i}"]`)!;
+      const toNode = recipientColumnEl.querySelector(`[data-can-id="${j}"]`)!;
 
-      if (!fromNode || !toNode) continue;
+      if (!fromNode || !toNode) {continue;}
 
       const fromRect = fromNode.getBoundingClientRect();
       const toRect = toNode.getBoundingClientRect();
