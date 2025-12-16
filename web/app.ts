@@ -706,6 +706,30 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
   graphSvgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
   const recipientSums = new Map<number, number>();
 
+  function addLabel(x: number, y: number, anchor: "start" | "middle" | "end", textValue: string): void {
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", String(x));
+    text.setAttribute("y", String(y));
+    text.setAttribute("text-anchor", anchor);
+    text.setAttribute("class", "edge-label");
+    text.textContent = textValue;
+
+    group.appendChild(text);
+    graphSvgEl.appendChild(group);
+
+    const bbox = text.getBBox();
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", String(bbox.x - 4));
+    rect.setAttribute("y", String(bbox.y - 2));
+    rect.setAttribute("width", String(bbox.width + 8));
+    rect.setAttribute("height", String(bbox.height + 4));
+    rect.setAttribute("rx", "4");
+    rect.setAttribute("class", "edge-label-bg");
+
+    group.insertBefore(rect, text);
+  }
+
   for (let i = 0; i < cans.length; i++) {
     for (let j = 0; j < cans.length; j++) {
       const amt = getTransferAmount(plan, i, j);
@@ -732,14 +756,8 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
       graphSvgEl.appendChild(path);
 
       const labelX = x1 + 12; // keep label aligned with donor
-      const labelY = y1 - 4;
-      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      text.setAttribute("x", String(labelX));
-      text.setAttribute("y", String(labelY));
-      text.setAttribute("text-anchor", "start");
-      text.setAttribute("class", "edge-label");
-      text.textContent = `${amt}g`;
-      graphSvgEl.appendChild(text);
+      const labelY = y1 - 6; // slight upward nudge to clear the stroke
+      addLabel(labelX, labelY, "start", `${amt}g`);
 
       const prevSum = recipientSums.get(j) ?? 0;
       recipientSums.set(j, prevSum + amt);
@@ -753,13 +771,7 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
     const x = toRect.left - gridRect.left - 10;
     const y = toRect.top + toRect.height / 2 - gridRect.top;
 
-    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    text.setAttribute("x", String(x));
-    text.setAttribute("y", String(y));
-    text.setAttribute("text-anchor", "end");
-    text.setAttribute("class", "edge-label");
-    text.textContent = `${total}g`;
-    graphSvgEl.appendChild(text);
+    addLabel(x, y, "end", `${total}g`);
   }
 }
 
