@@ -14,34 +14,14 @@
     </header>
     <form id="pack-form">
       <div class="columns" id="columns">
-        <div class="column" data-spec="msr110">
-          <h2>MSR 110g</h2>
-          <p class="hint">Capacity: 110g • Empty: 101g</p>
-          <div class="cells" data-spec="msr110">
-            <div class="cell">
-              <input type="number" name="gross_msr110_0" placeholder="Gross weight (g)" min="0" step="1">
-            </div>
-          </div>
-        </div>
-        <div class="column" data-spec="msr227">
-          <h2>MSR 227g</h2>
-          <p class="hint">Capacity: 227g • Empty: 147g</p>
-          <div class="cells" data-spec="msr227">
-            <div class="cell">
-              <input type="number" name="gross_msr227_0" placeholder="Gross weight (g)" min="0" step="1">
-            </div>
-          </div>
-        </div>
-        <div class="column" data-spec="msr450">
-          <h2>MSR 450g</h2>
-          <p class="hint">Capacity: 450g • Empty: 216g</p>
-          <div class="cells" data-spec="msr450">
-            <div class="cell">
-              <input type="number" name="gross_msr450_0" placeholder="Gross weight (g)" min="0" step="1">
-            </div>
-          </div>
-        </div>
       </div>
+      <template id="column-template">
+        <div class="column" data-spec="">
+          <h2 data-part="name"></h2>
+          <p class="hint" data-part="hint"></p>
+          <div class="cells" data-spec=""></div>
+        </div>
+      </template>
       <template id="cell-template">
         <div class="cell">
           <input type="number" placeholder="Gross weight (g)" min="0" step="1">

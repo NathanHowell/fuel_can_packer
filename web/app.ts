@@ -1,5 +1,5 @@
 import "./styles.css";
-import { computePlan, SPECS, type Can, type Plan } from "./solver";
+import { computePlan, SPECS, type Can, type Plan, type CanSpec } from "./solver";
 
 function getTransferAmount(plan: Plan, from: number, to: number): number {
   const row = plan.transfers[from];
@@ -65,6 +65,7 @@ function applyFillStyle(
 // DOM interaction
 const formEl = document.getElementById("pack-form") as HTMLFormElement;
 const columnsEl = document.getElementById("columns") as HTMLDivElement;
+const columnTemplateEl = document.getElementById("column-template") as HTMLTemplateElement | null;
 const cellTemplateEl = document.getElementById("cell-template") as HTMLTemplateElement | null;
 const statusEl = document.getElementById("status") as HTMLDivElement;
 const resultsEl = document.getElementById("results") as HTMLDivElement;
@@ -152,27 +153,57 @@ function bindCell(
   updateCellFill(cell, input);
 }
 
+function createColumn(spec: CanSpec): { column: HTMLDivElement; cellsContainer: HTMLDivElement } {
+  const fallback = (): { column: HTMLDivElement; cellsContainer: HTMLDivElement } => {
+    const column = document.createElement("div");
+    column.className = "column";
+    column.dataset["spec"] = spec.key;
+
+    const heading = document.createElement("h2");
+    heading.textContent = spec.name;
+    column.appendChild(heading);
+
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent = `Capacity: ${spec.capacity}g • Empty: ${spec.emptyWeight}g`;
+    column.appendChild(hint);
+
+    const cellsContainer = document.createElement("div");
+    cellsContainer.className = "cells";
+    cellsContainer.dataset["spec"] = spec.key;
+    column.appendChild(cellsContainer);
+
+    return { column, cellsContainer };
+  };
+
+  if (!columnTemplateEl?.content) {return fallback();}
+  const fragment = columnTemplateEl.content.cloneNode(true) as DocumentFragment;
+  const column = fragment.querySelector(".column") as HTMLDivElement | null;
+  const cellsContainer = fragment.querySelector(".cells") as HTMLDivElement | null;
+  const heading = fragment.querySelector('[data-part="name"]') as HTMLElement | null;
+  const hint = fragment.querySelector('[data-part="hint"]') as HTMLElement | null;
+  if (!column || !cellsContainer || !heading || !hint) {return fallback();}
+
+  column.dataset["spec"] = spec.key;
+  cellsContainer.dataset["spec"] = spec.key;
+  heading.textContent = spec.name;
+  hint.textContent = `Capacity: ${spec.capacity}g • Empty: ${spec.emptyWeight}g`;
+
+  return { column, cellsContainer };
+}
+
 function appendCell(cellsContainer: Element, specKey: string): void {
   const { cell, input } = createCell(specKey);
   cellsContainer.appendChild(cell);
   bindCell(cellsContainer, cell, input, specKey);
 }
 
-function initializeColumnsFromHtml(): void {
+function renderColumns(): void {
+  columnsEl.innerHTML = "";
   for (const spec of SPECS) {
-    const cellsContainer = columnsEl.querySelector(`.cells[data-spec="${spec.key}"]`);
-    if (!cellsContainer) {continue;}
-    const existingCells = Array.from(cellsContainer.querySelectorAll<HTMLDivElement>(".cell"));
-    if (existingCells.length === 0) {
-      appendCell(cellsContainer, spec.key);
-      continue;
-    }
-    for (const cell of existingCells) {
-      const input = cell.querySelector("input");
-      if (!input) {continue;}
-      if (!input.name) {input.name = nextInputName(spec.key);}
-      bindCell(cellsContainer, cell, input, spec.key);
-    }
+    const { column, cellsContainer } = createColumn(spec);
+    columnsEl.appendChild(column);
+    appendCell(cellsContainer, spec.key);
   }
 }
 
@@ -510,4 +541,4 @@ function renderTextOutput(cans: readonly Can[], plan: Plan): void {
 }
 
 // Initialize on load
-initializeColumnsFromHtml();
+renderColumns();
