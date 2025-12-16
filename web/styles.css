@@ -134,9 +134,6 @@
     @apply mt-2 bg-white border border-border rounded-lg p-3 min-h-[180px] whitespace-pre-wrap font-mono text-ink;
   }
 
-  .status { @apply m-0 text-sm text-muted; }
-  .error { @apply text-danger; }
-
   .input-errors {
     @apply hidden grid gap-2;
   }
@@ -211,4 +208,15 @@
   .edge { @apply stroke-accent/70 stroke-2 fill-none; }
   .edge-label-bg { @apply fill-panel opacity-75; }
   .edge-label { @apply fill-muted text-[12px] font-sans; }
+
+  .status-row {
+    @apply mt-2 flex items-center gap-2 text-sm font-mono border border-border rounded-lg px-3 py-2 bg-white;
+  }
+
+  .status-icon { @apply text-base; }
+
+  .status-row[data-state="idle"] { @apply text-muted; }
+  .status-row[data-state="solving"] { color: var(--color-accent); }
+  .status-row[data-state="success"] { color: #0f8f3a; }
+  .status-row[data-state="error"] { color: var(--color-danger); }
 }

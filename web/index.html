@@ -63,7 +63,6 @@
           <input type="number" placeholder="Gross weight (g)" min="0" step="1">
         </div>
       </template>
-      <div class="status" id="status">Ready</div>
       <div class="input-errors" id="input-errors" data-visible="false">
         <div class="error-msg" data-error="overflow">Gross weight exceeds that can’s capacity.</div>
         <div class="warn-msg" data-error="underflow">Gross weight is below the empty can weight.</div>
@@ -84,6 +83,10 @@
         <svg id="graph-svg"></svg>
       </div>
       <pre class="output" id="output"></pre>
+    </div>
+    <div class="status-row" id="status-row" data-state="idle" role="status" aria-live="polite">
+      <div class="status-icon" id="status-icon" aria-hidden="true">•</div>
+      <div class="status-text" id="status-text">Ready</div>
     </div>
   </div>
   <script type="module" src="./dist/app.js"></script>

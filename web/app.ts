@@ -67,7 +67,6 @@ const formEl = document.getElementById("pack-form") as HTMLFormElement;
 const columnsEl = document.getElementById("columns") as HTMLDivElement;
 const columnTemplateEl = document.getElementById("column-template") as HTMLTemplateElement | null;
 const cellTemplateEl = document.getElementById("cell-template") as HTMLTemplateElement | null;
-const statusEl = document.getElementById("status") as HTMLDivElement;
 const resultsEl = document.getElementById("results") as HTMLDivElement;
 const donorColumnEl = document.getElementById("donor-column") as HTMLDivElement;
 const recipientColumnEl = document.getElementById("recipient-column") as HTMLDivElement;
@@ -77,8 +76,51 @@ const outputEl = document.getElementById("output") as HTMLPreElement;
 const inputErrorsEl = document.getElementById("input-errors") as HTMLDivElement | null;
 const overflowErrorEl = document.querySelector<HTMLDivElement>('[data-error="overflow"]');
 const underflowErrorEl = document.querySelector<HTMLDivElement>('[data-error="underflow"]');
+const statusRowEl = document.getElementById("status-row") as HTMLDivElement | null;
+const statusIconEl = document.getElementById("status-icon") as HTMLDivElement | null;
+const statusTextEl = document.getElementById("status-text") as HTMLDivElement | null;
 let computeTimer: number | null = null;
 let computeGeneration = 0;
+let spinnerTimer: number | null = null;
+let spinnerFrame = 0;
+
+type StatusState = "idle" | "solving" | "success" | "error";
+
+const spinnerFrames: readonly string[] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+function stopSpinner(): void {
+  if (spinnerTimer !== null) {
+    window.clearInterval(spinnerTimer);
+    spinnerTimer = null;
+  }
+}
+
+function setStatus(state: StatusState, message: string): void {
+  if (!statusRowEl || !statusIconEl || !statusTextEl) {return;}
+
+  statusRowEl.setAttribute("data-state", state);
+  statusTextEl.textContent = message;
+
+  stopSpinner();
+
+  if (state === "solving") {
+    spinnerFrame = 0;
+    statusIconEl.textContent = spinnerFrames[spinnerFrame];
+    spinnerTimer = window.setInterval(() => {
+      spinnerFrame = (spinnerFrame + 1) % spinnerFrames.length;
+      statusIconEl.textContent = spinnerFrames[spinnerFrame];
+    }, 90);
+    return;
+  }
+
+  if (state === "success") {
+    statusIconEl.textContent = "✅";
+  } else if (state === "error") {
+    statusIconEl.textContent = "⚠️";
+  } else {
+    statusIconEl.textContent = "•";
+  }
+}
 
 let inputNameCounter = 0;
 
@@ -272,8 +314,7 @@ async function runCompute(): Promise<void> {
 
   if (cans.length === 0) {
     if (requestId !== computeGeneration) {return;}
-    statusEl.textContent = "Add gross weights to compute";
-    statusEl.classList.remove("error");
+    setStatus("idle", "Add gross weights to compute");
     if (inputErrorsEl !== null) {
       inputErrorsEl.setAttribute("data-visible", "false");
     }
@@ -286,8 +327,7 @@ async function runCompute(): Promise<void> {
   }
 
   if (foundUnderflow || foundOverflow) {
-    statusEl.textContent = "Invalid input found. Fix the highlighted cans.";
-    statusEl.classList.add("error");
+    setStatus("error", "Invalid input found. Fix the highlighted cans.");
     if (inputErrorsEl !== null) {
       inputErrorsEl.setAttribute("data-visible", "true");
       if (overflowErrorEl) {
@@ -305,8 +345,7 @@ async function runCompute(): Promise<void> {
     return;
   }
 
-  statusEl.textContent = "Solving…";
-  statusEl.classList.remove("error");
+  setStatus("solving", "Solving…");
   if (inputErrorsEl !== null) {
     inputErrorsEl.setAttribute("data-visible", "false");
   }
@@ -324,11 +363,10 @@ async function runCompute(): Promise<void> {
 
     // Show results using CSS data attribute
     resultsEl.setAttribute("data-visible", "true");
-    statusEl.textContent = "Complete";
+    setStatus("success", "Complete");
   } catch (err: unknown) {
     if (requestId !== computeGeneration) {return;}
-    statusEl.textContent = `Error: ${err instanceof Error ? err.message : String(err)}`;
-    statusEl.classList.add("error");
+    setStatus("error", `Error: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -555,3 +593,4 @@ function renderTextOutput(cans: readonly Can[], plan: Plan): void {
 
 // Initialize on load
 renderColumns();
+setStatus("idle", "Ready");
