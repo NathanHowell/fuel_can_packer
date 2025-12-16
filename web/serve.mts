@@ -21,7 +21,7 @@ const mime: Record<string, string> = {
 const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
   try {
     const host = req.headers.host;
-    if (!host || !req.url) {
+    if (host === undefined || req.url === undefined) {
       res.writeHead(400);
       res.end("Bad request");
       return;
@@ -29,7 +29,7 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
 
     const urlPath = decodeURIComponent(new URL(req.url, `http://${host}`).pathname);
     const safePath = normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
-    let filePath = join(root, safePath || ".");
+    let filePath = join(root, safePath !== "" ? safePath : ".");
     let info;
     try {
       info = await stat(filePath);
@@ -44,7 +44,7 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     }
 
     const buf = await readFile(filePath);
-    const type = mime[extname(filePath)] || "application/octet-stream";
+    const type = mime[extname(filePath)] ?? "application/octet-stream";
     res.writeHead(200, {
       "Content-Type": type,
       "Cross-Origin-Embedder-Policy": "require-corp",

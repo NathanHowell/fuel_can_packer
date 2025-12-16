@@ -62,14 +62,14 @@ const SPECS: readonly CanSpec[] = [
 
 // Utilities
 function lexLess(a: Score, b: Score): boolean {
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) {return a[i]! < b[i]!;}
-  }
+  if (a[0] !== b[0]) {return a[0] < b[0];}
+  if (a[1] !== b[1]) {return a[1] < b[1];}
+  if (a[2] !== b[2]) {return a[2] < b[2];}
   return false;
 }
 
 function zeros2(n: number): number[][] {
-  return Array.from({ length: n }, () => Array(n).fill(0));
+  return Array.from({ length: n }, () => Array<number>(n).fill(0));
 }
 
 function allocateMinEdgesAndMinTransfer(
@@ -97,15 +97,19 @@ function allocateMinEdgesAndMinTransfer(
       while (left > 0) {
         let best = -1;
         for (let i = 0; i < R; i++) {
-          if (caps[i]! > 0) {
+          const cap = caps[i];
+          if (cap !== undefined && cap > 0) {
             best = i;
             break;
           }
         }
         if (best < 0) {return null;}
-        const take = Math.min(left, caps[best]!);
-        edges.push({ from: d.from, to: recipients[best]!.to, amt: take });
-        caps[best]! -= take;
+        const capAtBest = caps[best];
+        const recipient = recipients[best];
+        if (capAtBest === undefined || recipient === undefined) {return null;}
+        const take = Math.min(left, capAtBest);
+        edges.push({ from: d.from, to: recipient.to, amt: take });
+        caps[best] = capAtBest - take;
         left -= take;
       }
     }
@@ -129,7 +133,7 @@ function allocateMinEdgesAndMinTransfer(
   function sumTopCaps(caps: readonly number[], k: number): number {
     const tmp = caps.filter((c) => c > 0).sort((a, b) => b - a);
     let s = 0;
-    for (let i = 0; i < Math.min(k, tmp.length); i++) {s += tmp[i]!;}
+    for (const cap of tmp.slice(0, Math.min(k, tmp.length))) {s += cap;}
     return s;
   }
 
@@ -149,8 +153,13 @@ function allocateMinEdgesAndMinTransfer(
       return null;
     }
 
-    const d = donors[dIdx]!;
-    const need = d.amt;
+    const d = donors[dIdx];
+    if (!d) {
+      memo.set(memoKey, 1);
+      return null;
+    }
+    const donor = d;
+    const need = donor.amt;
 
     const nonZeroCaps = caps.reduce((a, c) => a + (c > 0 ? 1 : 0), 0);
     if (nonZeroCaps === 0) {
@@ -174,30 +183,46 @@ function allocateMinEdgesAndMinTransfer(
       if (sumTopCaps(caps, pieces) < need) {continue;}
 
       const candIdxs: number[] = [];
-      for (let i = 0; i < R; i++) {if (caps[i]! > 0) {candIdxs.push(i);}}
+      for (let i = 0; i < R; i++) {
+        const cap = caps[i];
+        if (cap !== undefined && cap > 0) {candIdxs.push(i);}
+      }
 
-      const combo: number[] = new Array(pieces);
+      const combo: number[] = new Array<number>(pieces);
 
       function chooseCombo(pos: number, start: number): readonly Edge[] | null {
         if (pos === pieces) {
           let sum = 0;
-          for (let k = 0; k < pieces; k++) {sum += caps[combo[k]!]!;}
+          for (let k = 0; k < pieces; k++) {
+            const idx = combo[k];
+            if (idx === undefined) {return null;}
+            const cap = caps[idx];
+            if (cap === undefined) {return null;}
+            sum += cap;
+          }
           if (sum < need) {return null;}
 
-          const assigns: number[] = new Array(pieces).fill(0);
+          const assigns: number[] = new Array<number>(pieces).fill(0);
 
           function assignAmounts(p: number, left: number): boolean {
+            const idx = combo[p];
+            if (idx === undefined) {return false;}
+            const capHere = caps[idx];
+            if (capHere === undefined) {return false;}
             if (p === pieces - 1) {
-              const idx = combo[p]!;
-              if (left < 1 || left > caps[idx]!) {return false;}
+              if (left < 1 || left > capHere) {return false;}
               assigns[p] = left;
               return true;
             }
-            const idx = combo[p]!;
-            const capHere = caps[idx]!;
 
             let restMax = 0;
-            for (let q = p + 1; q < pieces; q++) {restMax += caps[combo[q]!]!;}
+            for (let q = p + 1; q < pieces; q++) {
+              const nextIdx = combo[q];
+              if (nextIdx === undefined) {return false;}
+              const cap = caps[nextIdx];
+              if (cap === undefined) {return false;}
+              restMax += cap;
+            }
 
             const minHere = Math.max(1, left - restMax);
             const maxHere = Math.min(capHere, left - (pieces - p - 1));
@@ -215,10 +240,14 @@ function allocateMinEdgesAndMinTransfer(
           const nextCaps = caps.slice();
           const edgeList: Edge[] = [];
           for (let k = 0; k < pieces; k++) {
-            const ridx = combo[k]!;
-            const amt = assigns[k]!;
-            nextCaps[ridx]! -= amt;
-            edgeList.push({ from: d.from, to: recipients[ridx]!.to, amt });
+            const ridx = combo[k];
+            const amt = assigns[k];
+            if (ridx === undefined || amt === undefined) {return null;}
+            const nextCap = nextCaps[ridx];
+            const recipient = recipients[ridx];
+            if (nextCap === undefined || recipient === undefined) {return null;}
+            nextCaps[ridx] = nextCap - amt;
+            edgeList.push({ from: donor.from, to: recipient.to, amt });
           }
 
           const tail = dfs(dIdx + 1, edgesLeft - pieces, nextCaps, memo);
@@ -227,7 +256,9 @@ function allocateMinEdgesAndMinTransfer(
         }
 
         for (let i = start; i <= candIdxs.length - (pieces - pos); i++) {
-          combo[pos] = candIdxs[i]!;
+          const candIdx = candIdxs[i];
+          if (candIdx === undefined) {continue;}
+          combo[pos] = candIdx;
           const res = chooseCombo(pos + 1, i + 1);
           if (res) {return res;}
         }
@@ -250,7 +281,7 @@ function allocateMinEdgesAndMinTransfer(
       const merged = new Map<string, number>();
       for (const e of edges) {
         const k = `${e.from}|${e.to}`;
-        merged.set(k, (merged.get(k) || 0) + e.amt);
+        merged.set(k, (merged.get(k) ?? 0) + e.amt);
       }
       const out: Edge[] = [];
       for (const [k, amt] of merged.entries()) {
@@ -291,30 +322,46 @@ async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
     let emptyCost = 0;
     for (let i = 0; i < n; i++) {
       if (mask & (1 << i)) {
-        capSum += caps[i]!;
-        emptyCost += empties[i]!;
+        const capVal = caps[i];
+        const emptyVal = empties[i];
+        if (capVal === undefined || emptyVal === undefined) {
+          throw new Error("internal: missing can data");
+        }
+        capSum += capVal;
+        emptyCost += emptyVal;
       }
     }
     if (capSum < totalFuel) {continue;}
 
-    const keep: boolean[] = Array(n).fill(false);
+    const keep: boolean[] = Array<boolean>(n).fill(false);
     for (let i = 0; i < n; i++) {keep[i] = !!(mask & (1 << i));}
 
-    const baseline: number[] = Array(n).fill(0);
+    const baseline: number[] = Array<number>(n).fill(0);
     const slack: Recipient[] = [];
     for (let i = 0; i < n; i++) {
       if (!keep[i]) {continue;}
-      baseline[i] = Math.min(init[i]!, caps[i]!);
-      const s = caps[i]! - baseline[i]!;
+      const initVal = init[i];
+      const capVal = caps[i];
+      if (initVal === undefined || capVal === undefined) {
+        throw new Error("internal: missing can data");
+      }
+      const base = Math.min(initVal, capVal);
+      baseline[i] = base;
+      const s = capVal - base;
       if (s > 0) {slack.push({ to: i, cap: s });}
     }
 
     const donors: Donor[] = [];
     for (let i = 0; i < n; i++) {
+      const initVal = init[i];
+      const capVal = caps[i];
+      if (initVal === undefined || capVal === undefined) {
+        throw new Error("internal: missing can data");
+      }
       if (!keep[i]) {
-        if (init[i]! > 0) {donors.push({ from: i, amt: init[i]! });}
+        if (initVal > 0) {donors.push({ from: i, amt: initVal });}
       } else {
-        const excess = Math.max(0, init[i]! - caps[i]!);
+        const excess = Math.max(0, initVal - capVal);
         if (excess > 0) {donors.push({ from: i, amt: excess });}
       }
     }
@@ -323,21 +370,43 @@ async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
     if (!alloc) {continue;}
 
     const transfers: number[][] = zeros2(n);
-    for (const e of alloc.edges) {transfers[e.from]![e.to]! += e.amt;}
+    for (const e of alloc.edges) {
+      const row = transfers[e.from];
+      if (!row) {throw new Error("internal: missing transfer row");}
+      const current = row[e.to];
+      if (current === undefined) {throw new Error("internal: missing transfer entry");}
+      row[e.to] = current + e.amt;
+    }
 
-    const finalFuel: number[] = Array(n).fill(0);
-    for (let i = 0; i < n; i++) {finalFuel[i] = keep[i] ? baseline[i]! : 0;}
-    for (const e of alloc.edges) {finalFuel[e.to]! += e.amt;}
+    const finalFuel: number[] = Array<number>(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      const base = baseline[i];
+      if (base === undefined) {throw new Error("internal: missing baseline");}
+      finalFuel[i] = keep[i] ? base : 0;
+    }
+    for (const e of alloc.edges) {
+      const current = finalFuel[e.to];
+      if (current === undefined) {throw new Error("internal: invalid recipient index");}
+      finalFuel[e.to] = current + e.amt;
+    }
 
     for (let i = 0; i < n; i++) {
-      if (!keep[i] && finalFuel[i] !== 0) {
+      const finalFuelVal = finalFuel[i];
+      const capVal = caps[i];
+      const initVal = init[i];
+      if (finalFuelVal === undefined || capVal === undefined || initVal === undefined) {
+        throw new Error("internal: missing can data");
+      }
+      if (!keep[i] && finalFuelVal !== 0) {
         throw new Error("internal: non-kept can ended with fuel");
       }
-      if (keep[i] && (finalFuel[i]! < 0 || finalFuel[i]! > caps[i]!)) {
+      if (keep[i] && (finalFuelVal < 0 || finalFuelVal > capVal)) {
         throw new Error("internal: capacity violation");
       }
-      const out = transfers[i]!.reduce((a, b) => a + b, 0);
-      if (out > init[i]!) {throw new Error("internal: outflow > initial fuel");}
+      const row = transfers[i];
+      if (!row) {throw new Error("internal: missing transfer row");}
+      const out = row.reduce((a, b) => a + b, 0);
+      if (out > initVal) {throw new Error("internal: outflow > initial fuel");}
     }
     const sumFinal = finalFuel.reduce((a, b) => a + b, 0);
     if (sumFinal !== totalFuel) {throw new Error("internal: fuel not conserved");}
@@ -357,7 +426,9 @@ async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
 
 function assignIds(cans: Can[]): void {
   for (let i = 0; i < cans.length; i++) {
-    cans[i]!.id = i;
+    const can = cans[i];
+    if (!can) {continue;}
+    can.id = i;
   }
 }
 
@@ -365,6 +436,15 @@ async function compute(cans: readonly Can[]): Promise<SolutionResult> {
   assignIds([...cans]);
   const plan = await solveWithJS(cans);
   return { plan, cans };
+}
+
+function getTransferAmount(plan: Plan, from: number, to: number): number {
+  const row = plan.transfers[from];
+  return row?.[to] ?? 0;
+}
+
+function getFinalFuel(plan: Plan, idx: number): number {
+  return plan.final_fuel[idx] ?? 0;
 }
 
 // DOM interaction
@@ -400,7 +480,7 @@ function initializeColumns(): void {
 }
 
 function addCell(specKey: string): void {
-  const cellsContainer = columnsEl.querySelector(`.cells[data-spec="${specKey}"]`)!;
+  const cellsContainer = columnsEl.querySelector(`.cells[data-spec="${specKey}"]`);
   if (!cellsContainer) {return;}
 
   const cell = document.createElement("div");
@@ -415,12 +495,12 @@ function addCell(specKey: string): void {
 
   // Add another cell when this one is filled
   input.addEventListener("input", () => {
-    if (input.value && !input.placeholder) {
+    if (input.value !== "" && input.placeholder === "") {
       const cells = cellsContainer.querySelectorAll(".cell");
       const lastCell = cells[cells.length - 1];
       if (lastCell) {
         const lastInput = lastCell.querySelector("input");
-        if (lastInput && lastInput.value) {
+        if (lastInput?.value !== "") {
           addCell(specKey);
         }
       }
@@ -511,7 +591,8 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
 
   // Render donor nodes
   for (const idx of donors) {
-    const can = cans[idx]!;
+    const can = cans[idx];
+    if (!can) {continue;}
     const node = document.createElement("div");
     node.className = "node";
     node.setAttribute("data-can-id", String(idx));
@@ -531,8 +612,9 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
 
   // Render recipient nodes
   for (const idx of recipients) {
-    const can = cans[idx]!;
-    const finalFuel = plan.final_fuel[idx]!;
+    const can = cans[idx];
+    if (!can) {continue;}
+    const finalFuel = getFinalFuel(plan, idx);
     const node = document.createElement("div");
     node.className = "node";
     node.setAttribute("data-can-id", String(idx));
@@ -559,11 +641,11 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
 
   for (let i = 0; i < cans.length; i++) {
     for (let j = 0; j < cans.length; j++) {
-      const amt = plan.transfers[i]![j]!;
+      const amt = getTransferAmount(plan, i, j);
       if (amt <= 0) {continue;}
 
-      const fromNode = donorColumnEl.querySelector(`[data-can-id="${i}"]`)!;
-      const toNode = recipientColumnEl.querySelector(`[data-can-id="${j}"]`)!;
+      const fromNode = donorColumnEl.querySelector(`[data-can-id="${i}"]`);
+      const toNode = recipientColumnEl.querySelector(`[data-can-id="${j}"]`);
 
       if (!fromNode || !toNode) {continue;}
 
@@ -598,8 +680,10 @@ function renderTextOutput(cans: readonly Can[], plan: Plan): void {
   text += "Cans to keep:\n";
   for (let i = 0; i < cans.length; i++) {
     if (plan.keep[i]) {
-      const can = cans[i]!;
-      text += `  • Can #${i + 1}: ${can.spec.name} with ${plan.final_fuel[i]}g fuel\n`;
+      const can = cans[i];
+      if (!can) {continue;}
+      const finalFuel = getFinalFuel(plan, i);
+      text += `  • Can #${i + 1}: ${can.spec.name} with ${finalFuel}g fuel\n`;
     }
   }
 
@@ -607,7 +691,7 @@ function renderTextOutput(cans: readonly Can[], plan: Plan): void {
   let hasTransfers = false;
   for (let i = 0; i < cans.length; i++) {
     for (let j = 0; j < cans.length; j++) {
-      const amt = plan.transfers[i]![j]!;
+      const amt = getTransferAmount(plan, i, j);
       if (amt > 0) {
         hasTransfers = true;
         text += `  • ${amt}g from Can #${i + 1} to Can #${j + 1}\n`;
@@ -621,7 +705,7 @@ function renderTextOutput(cans: readonly Can[], plan: Plan): void {
   const totalFuel = plan.final_fuel.reduce((a, b) => a + b, 0);
   const totalWeight = cans.reduce(
     (sum, can, i) =>
-      plan.keep[i] ? sum + can.spec.emptyWeight + plan.final_fuel[i]! : sum,
+      plan.keep[i] ? sum + can.spec.emptyWeight + getFinalFuel(plan, i) : sum,
     0
   );
 

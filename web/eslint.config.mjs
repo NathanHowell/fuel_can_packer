@@ -17,13 +17,13 @@ export default tseslint.config(
       "@typescript-eslint/explicit-function-return-type": "error",
       "@typescript-eslint/explicit-module-boundary-types": "error",
       "@typescript-eslint/no-explicit-any": "error",
-      "@typescript-eslint/no-unsafe-assignment": "warn", // Warn for Array.fill() issues
+      "@typescript-eslint/no-unsafe-assignment": "error",
       "@typescript-eslint/no-unsafe-member-access": "error",
       "@typescript-eslint/no-unsafe-call": "error",
-      "@typescript-eslint/no-unsafe-return": "warn", // Warn for Array.fill() issues
+      "@typescript-eslint/no-unsafe-return": "error",
       "@typescript-eslint/no-unsafe-argument": "error",
       "@typescript-eslint/strict-boolean-expressions": [
-        "warn", // Warn instead of error - still valuable but not blocking
+        "error",
         {
           allowString: false,
           allowNumber: true, // Allow number in conditionals (common in JS)
@@ -34,14 +34,14 @@ export default tseslint.config(
           allowAny: false,
         },
       ],
-      "@typescript-eslint/no-unnecessary-condition": "warn", // Warn instead of error
+      "@typescript-eslint/no-unnecessary-condition": "error",
       "@typescript-eslint/no-confusing-void-expression": [
         "error",
         { ignoreArrowShorthand: true },
       ],
       "@typescript-eslint/prefer-readonly": "error",
-      "@typescript-eslint/prefer-optional-chain": "warn", // Warn instead of error
-      "@typescript-eslint/prefer-nullish-coalescing": "warn", // Warn instead of error
+      "@typescript-eslint/prefer-optional-chain": "error",
+      "@typescript-eslint/prefer-nullish-coalescing": "error",
       "@typescript-eslint/no-misused-promises": [
         "error",
         {
@@ -51,7 +51,7 @@ export default tseslint.config(
           },
         },
       ],
-      "@typescript-eslint/use-unknown-in-catch-callback-variable": "warn", // Warn instead of error
+      "@typescript-eslint/use-unknown-in-catch-callback-variable": "error",
       "@typescript-eslint/prefer-readonly-parameter-types": "off", // Too strict for practical use
       "@typescript-eslint/no-magic-numbers": "off", // Too strict for practical use
       "@typescript-eslint/naming-convention": [
@@ -100,7 +100,7 @@ export default tseslint.config(
           varsIgnorePattern: "^_",
         },
       ],
-      "@typescript-eslint/no-non-null-assertion": "warn", // Warn but don't error - common in TS
+      "@typescript-eslint/no-non-null-assertion": "error", // Block unsafe non-null assertions
       "@typescript-eslint/restrict-template-expressions": [
         "error",
         {

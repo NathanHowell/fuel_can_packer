@@ -56,15 +56,27 @@ const SPECS: readonly CanSpec[] = [
   { key: "msr450", name: "MSR 450g", capacity: 450, emptyWeight: 216 },
 ] as const;
 
-function lexLess(a: Score, b: Score): boolean {
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) {return a[i]! < b[i]!;}
+function getSpecByKey(key: string): CanSpec {
+  const spec = SPECS.find((s) => s.key === key);
+  if (!spec) {
+    throw new Error(`Spec ${key} not found`);
   }
+  return spec;
+}
+
+const msr110Spec = getSpecByKey("msr110");
+const msr227Spec = getSpecByKey("msr227");
+const msr450Spec = getSpecByKey("msr450");
+
+function lexLess(a: Score, b: Score): boolean {
+  if (a[0] !== b[0]) {return a[0] < b[0];}
+  if (a[1] !== b[1]) {return a[1] < b[1];}
+  if (a[2] !== b[2]) {return a[2] < b[2];}
   return false;
 }
 
 function zeros2(n: number): number[][] {
-  return Array.from({ length: n }, () => Array(n).fill(0));
+  return Array.from({ length: n }, () => Array<number>(n).fill(0));
 }
 
 function allocateMinEdgesAndMinTransfer(
@@ -92,15 +104,19 @@ function allocateMinEdgesAndMinTransfer(
       while (left > 0) {
         let best = -1;
         for (let i = 0; i < R; i++) {
-          if (caps[i]! > 0) {
+          const cap = caps[i];
+          if (cap !== undefined && cap > 0) {
             best = i;
             break;
           }
         }
         if (best < 0) {return null;}
-        const take = Math.min(left, caps[best]!);
-        edges.push({ from: d.from, to: recipients[best]!.to, amt: take });
-        caps[best]! -= take;
+        const capAtBest = caps[best];
+        const recipient = recipients[best];
+        if (capAtBest === undefined || recipient === undefined) {return null;}
+        const take = Math.min(left, capAtBest);
+        edges.push({ from: d.from, to: recipient.to, amt: take });
+        caps[best] = capAtBest - take;
         left -= take;
       }
     }
@@ -124,7 +140,7 @@ function allocateMinEdgesAndMinTransfer(
   function sumTopCaps(caps: readonly number[], k: number): number {
     const tmp = caps.filter((c) => c > 0).sort((a, b) => b - a);
     let s = 0;
-    for (let i = 0; i < Math.min(k, tmp.length); i++) {s += tmp[i]!;}
+    for (const cap of tmp.slice(0, Math.min(k, tmp.length))) {s += cap;}
     return s;
   }
 
@@ -144,8 +160,13 @@ function allocateMinEdgesAndMinTransfer(
       return null;
     }
 
-    const d = donors[dIdx]!;
-    const need = d.amt;
+    const d = donors[dIdx];
+    if (!d) {
+      memo.set(memoKey, 1);
+      return null;
+    }
+    const donor = d;
+    const need = donor.amt;
 
     const nonZeroCaps = caps.reduce((a, c) => a + (c > 0 ? 1 : 0), 0);
     if (nonZeroCaps === 0) {
@@ -169,30 +190,46 @@ function allocateMinEdgesAndMinTransfer(
       if (sumTopCaps(caps, pieces) < need) {continue;}
 
       const candIdxs: number[] = [];
-      for (let i = 0; i < R; i++) {if (caps[i]! > 0) {candIdxs.push(i);}}
+      for (let i = 0; i < R; i++) {
+        const cap = caps[i];
+        if (cap !== undefined && cap > 0) {candIdxs.push(i);}
+      }
 
-      const combo: number[] = new Array(pieces);
+      const combo: number[] = new Array<number>(pieces);
 
       function chooseCombo(pos: number, start: number): readonly Edge[] | null {
         if (pos === pieces) {
           let sum = 0;
-          for (let k = 0; k < pieces; k++) {sum += caps[combo[k]!]!;}
+          for (let k = 0; k < pieces; k++) {
+            const idx = combo[k];
+            if (idx === undefined) {return null;}
+            const cap = caps[idx];
+            if (cap === undefined) {return null;}
+            sum += cap;
+          }
           if (sum < need) {return null;}
 
-          const assigns: number[] = new Array(pieces).fill(0);
+          const assigns: number[] = new Array<number>(pieces).fill(0);
 
           function assignAmounts(p: number, left: number): boolean {
+            const idx = combo[p];
+            if (idx === undefined) {return false;}
+            const capHere = caps[idx];
+            if (capHere === undefined) {return false;}
             if (p === pieces - 1) {
-              const idx = combo[p]!;
-              if (left < 1 || left > caps[idx]!) {return false;}
+              if (left < 1 || left > capHere) {return false;}
               assigns[p] = left;
               return true;
             }
-            const idx = combo[p]!;
-            const capHere = caps[idx]!;
 
             let restMax = 0;
-            for (let q = p + 1; q < pieces; q++) {restMax += caps[combo[q]!]!;}
+            for (let q = p + 1; q < pieces; q++) {
+              const nextIdx = combo[q];
+              if (nextIdx === undefined) {return false;}
+              const cap = caps[nextIdx];
+              if (cap === undefined) {return false;}
+              restMax += cap;
+            }
 
             const minHere = Math.max(1, left - restMax);
             const maxHere = Math.min(capHere, left - (pieces - p - 1));
@@ -210,10 +247,14 @@ function allocateMinEdgesAndMinTransfer(
           const nextCaps = caps.slice();
           const edgeList: Edge[] = [];
           for (let k = 0; k < pieces; k++) {
-            const ridx = combo[k]!;
-            const amt = assigns[k]!;
-            nextCaps[ridx]! -= amt;
-            edgeList.push({ from: d.from, to: recipients[ridx]!.to, amt });
+            const ridx = combo[k];
+            const amt = assigns[k];
+            if (ridx === undefined || amt === undefined) {return null;}
+            const nextCap = nextCaps[ridx];
+            const recipient = recipients[ridx];
+            if (nextCap === undefined || recipient === undefined) {return null;}
+            nextCaps[ridx] = nextCap - amt;
+            edgeList.push({ from: donor.from, to: recipient.to, amt });
           }
 
           const tail = dfs(dIdx + 1, edgesLeft - pieces, nextCaps, memo);
@@ -222,7 +263,9 @@ function allocateMinEdgesAndMinTransfer(
         }
 
         for (let i = start; i <= candIdxs.length - (pieces - pos); i++) {
-          combo[pos] = candIdxs[i]!;
+          const candIdx = candIdxs[i];
+          if (candIdx === undefined) {continue;}
+          combo[pos] = candIdx;
           const res = chooseCombo(pos + 1, i + 1);
           if (res) {return res;}
         }
@@ -245,7 +288,7 @@ function allocateMinEdgesAndMinTransfer(
       const merged = new Map<string, number>();
       for (const e of edges) {
         const k = `${e.from}|${e.to}`;
-        merged.set(k, (merged.get(k) || 0) + e.amt);
+        merged.set(k, (merged.get(k) ?? 0) + e.amt);
       }
       const out: Edge[] = [];
       for (const [k, amt] of merged.entries()) {
@@ -286,30 +329,46 @@ async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
     let emptyCost = 0;
     for (let i = 0; i < n; i++) {
       if (mask & (1 << i)) {
-        capSum += caps[i]!;
-        emptyCost += empties[i]!;
+        const capVal = caps[i];
+        const emptyVal = empties[i];
+        if (capVal === undefined || emptyVal === undefined) {
+          throw new Error("internal: missing can data");
+        }
+        capSum += capVal;
+        emptyCost += emptyVal;
       }
     }
     if (capSum < totalFuel) {continue;}
 
-    const keep: boolean[] = Array(n).fill(false);
+    const keep: boolean[] = Array<boolean>(n).fill(false);
     for (let i = 0; i < n; i++) {keep[i] = !!(mask & (1 << i));}
 
-    const baseline: number[] = Array(n).fill(0);
+    const baseline: number[] = Array<number>(n).fill(0);
     const slack: Recipient[] = [];
     for (let i = 0; i < n; i++) {
       if (!keep[i]) {continue;}
-      baseline[i] = Math.min(init[i]!, caps[i]!);
-      const s = caps[i]! - baseline[i]!;
+      const initVal = init[i];
+      const capVal = caps[i];
+      if (initVal === undefined || capVal === undefined) {
+        throw new Error("internal: missing can data");
+      }
+      const base = Math.min(initVal, capVal);
+      baseline[i] = base;
+      const s = capVal - base;
       if (s > 0) {slack.push({ to: i, cap: s });}
     }
 
     const donors: Donor[] = [];
     for (let i = 0; i < n; i++) {
+      const initVal = init[i];
+      const capVal = caps[i];
+      if (initVal === undefined || capVal === undefined) {
+        throw new Error("internal: missing can data");
+      }
       if (!keep[i]) {
-        if (init[i]! > 0) {donors.push({ from: i, amt: init[i]! });}
+        if (initVal > 0) {donors.push({ from: i, amt: initVal });}
       } else {
-        const excess = Math.max(0, init[i]! - caps[i]!);
+        const excess = Math.max(0, initVal - capVal);
         if (excess > 0) {donors.push({ from: i, amt: excess });}
       }
     }
@@ -318,21 +377,43 @@ async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
     if (!alloc) {continue;}
 
     const transfers: number[][] = zeros2(n);
-    for (const e of alloc.edges) {transfers[e.from]![e.to]! += e.amt;}
+    for (const e of alloc.edges) {
+      const row = transfers[e.from];
+      if (!row) {throw new Error("internal: missing transfer row");}
+      const current = row[e.to];
+      if (current === undefined) {throw new Error("internal: missing transfer entry");}
+      row[e.to] = current + e.amt;
+    }
 
-    const finalFuel: number[] = Array(n).fill(0);
-    for (let i = 0; i < n; i++) {finalFuel[i] = keep[i] ? baseline[i]! : 0;}
-    for (const e of alloc.edges) {finalFuel[e.to]! += e.amt;}
+    const finalFuel: number[] = Array<number>(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      const base = baseline[i];
+      if (base === undefined) {throw new Error("internal: missing baseline");}
+      finalFuel[i] = keep[i] ? base : 0;
+    }
+    for (const e of alloc.edges) {
+      const current = finalFuel[e.to];
+      if (current === undefined) {throw new Error("internal: invalid recipient index");}
+      finalFuel[e.to] = current + e.amt;
+    }
 
     for (let i = 0; i < n; i++) {
-      if (!keep[i] && finalFuel[i] !== 0) {
+      const finalFuelVal = finalFuel[i];
+      const capVal = caps[i];
+      const initVal = init[i];
+      if (finalFuelVal === undefined || capVal === undefined || initVal === undefined) {
+        throw new Error("internal: missing can data");
+      }
+      if (!keep[i] && finalFuelVal !== 0) {
         throw new Error("internal: non-kept can ended with fuel");
       }
-      if (keep[i] && (finalFuel[i]! < 0 || finalFuel[i]! > caps[i]!)) {
+      if (keep[i] && (finalFuelVal < 0 || finalFuelVal > capVal)) {
         throw new Error("internal: capacity violation");
       }
-      const out = transfers[i]!.reduce((a, b) => a + b, 0);
-      if (out > init[i]!) {throw new Error("internal: outflow > initial fuel");}
+      const row = transfers[i];
+      if (!row) {throw new Error("internal: missing transfer row");}
+      const out = row.reduce((a, b) => a + b, 0);
+      if (out > initVal) {throw new Error("internal: outflow > initial fuel");}
     }
     const sumFinal = finalFuel.reduce((a, b) => a + b, 0);
     if (sumFinal !== totalFuel) {throw new Error("internal: fuel not conserved");}
@@ -357,8 +438,8 @@ async function runTests(): Promise<void> {
   // Test 1: Two MSR 227g cans, one nearly empty, one nearly full
   console.log("Test 1: Two MSR 227g cans");
   const test1: Can[] = [
-    { spec: SPECS[1]!, fuel: 180, gross: 327 },
-    { spec: SPECS[1]!, fuel: 30, gross: 177 },
+    { spec: msr227Spec, fuel: 180, gross: 327 },
+    { spec: msr227Spec, fuel: 30, gross: 177 },
   ];
   const result1 = await solveWithJS(test1);
   console.log("  Keep:", result1.keep);
@@ -369,9 +450,9 @@ async function runTests(): Promise<void> {
   // Test 2: Mix of can sizes
   console.log("Test 2: Mixed can sizes");
   const test2: Can[] = [
-    { spec: SPECS[0]!, fuel: 90, gross: 191 },   // MSR 110g
-    { spec: SPECS[1]!, fuel: 200, gross: 347 },  // MSR 227g
-    { spec: SPECS[2]!, fuel: 100, gross: 316 },  // MSR 450g
+    { spec: msr110Spec, fuel: 90, gross: 191 },   // MSR 110g
+    { spec: msr227Spec, fuel: 200, gross: 347 },  // MSR 227g
+    { spec: msr450Spec, fuel: 100, gross: 316 },  // MSR 450g
   ];
   const result2 = await solveWithJS(test2);
   console.log("  Keep:", result2.keep);
@@ -382,8 +463,8 @@ async function runTests(): Promise<void> {
   // Test 3: Empty cans
   console.log("Test 3: All empty cans");
   const test3: Can[] = [
-    { spec: SPECS[0]!, fuel: 0, gross: 101 },
-    { spec: SPECS[1]!, fuel: 0, gross: 147 },
+    { spec: msr110Spec, fuel: 0, gross: 101 },
+    { spec: msr227Spec, fuel: 0, gross: 147 },
   ];
   const result3 = await solveWithJS(test3);
   console.log("  Keep:", result3.keep);
@@ -393,7 +474,7 @@ async function runTests(): Promise<void> {
   console.log("All tests completed successfully!");
 }
 
-runTests().catch(err => {
+runTests().catch((err: unknown) => {
   console.error("Test failed:", err);
   process.exit(1);
 });
