@@ -708,6 +708,58 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
   graphSvgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
   const recipientSums = new Map<number, number>();
 
+  type EdgeRender = {
+    fromIdx: number;
+    toIdx: number;
+    amt: number;
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    labelOffset: number;
+  };
+  const edgesToRender: EdgeRender[] = [];
+
+  // Collect all edges with geometry
+  for (let i = 0; i < cans.length; i++) {
+    for (let j = 0; j < cans.length; j++) {
+      const amt = getTransferAmount(plan, i, j);
+      if (amt <= 0) {continue;}
+
+      const fromNode = donorColumnEl.querySelector(`[data-can-id="${i}"]`);
+      const toNode = recipientColumnEl.querySelector(`[data-can-id="${j}"]`);
+      if (!fromNode || !toNode) {continue;}
+
+      const fromRect = fromNode.getBoundingClientRect();
+      const toRect = toNode.getBoundingClientRect();
+      const x1 = fromRect.right - gridRect.left;
+      const y1 = fromRect.top + fromRect.height / 2 - gridRect.top;
+      const x2 = toRect.left - gridRect.left;
+      const y2 = toRect.top + toRect.height / 2 - gridRect.top;
+
+      edgesToRender.push({ fromIdx: i, toIdx: j, amt, x1, y1, x2, y2, labelOffset: 0 });
+    }
+  }
+
+  // Offset labels per donor to avoid overlap while keeping the same anchor x
+  const labelSpacing = 16;
+  const edgesByFrom = new Map<number, EdgeRender[]>();
+  for (const edge of edgesToRender) {
+    const list = edgesByFrom.get(edge.fromIdx);
+    if (list) {
+      list.push(edge);
+    } else {
+      edgesByFrom.set(edge.fromIdx, [edge]);
+    }
+  }
+  for (const list of edgesByFrom.values()) {
+    list.sort((a, b) => a.y2 - b.y2);
+    const mid = (list.length - 1) / 2;
+    list.forEach((edge, idx) => {
+      edge.labelOffset = (idx - mid) * labelSpacing;
+    });
+  }
+
   function addLabel(x: number, y: number, anchor: "start" | "middle" | "end", textValue: string): void {
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -732,38 +784,21 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
     group.insertBefore(rect, text);
   }
 
-  for (let i = 0; i < cans.length; i++) {
-    for (let j = 0; j < cans.length; j++) {
-      const amt = getTransferAmount(plan, i, j);
-      if (amt <= 0) {continue;}
+  for (const edge of edgesToRender) {
+    const { toIdx, amt, x1, y1, x2, y2, labelOffset } = edge;
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    const midX = (x1 + x2) / 2;
+    path.setAttribute("d", `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+    path.setAttribute("fill", "none");
+    path.setAttribute("class", "edge");
+    graphSvgEl.appendChild(path);
 
-      const fromNode = donorColumnEl.querySelector(`[data-can-id="${i}"]`);
-      const toNode = recipientColumnEl.querySelector(`[data-can-id="${j}"]`);
+    const labelX = x1 + 12; // keep label aligned with donor
+    const labelY = y1 + labelOffset;
+    addLabel(labelX, labelY, "start", `${amt}g`);
 
-      if (!fromNode || !toNode) {continue;}
-
-      const fromRect = fromNode.getBoundingClientRect();
-      const toRect = toNode.getBoundingClientRect();
-
-      const x1 = fromRect.right - gridRect.left;
-      const y1 = fromRect.top + fromRect.height / 2 - gridRect.top;
-      const x2 = toRect.left - gridRect.left;
-      const y2 = toRect.top + toRect.height / 2 - gridRect.top;
-
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      const midX = (x1 + x2) / 2;
-      path.setAttribute("d", `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
-      path.setAttribute("fill", "none");
-      path.setAttribute("class", "edge");
-      graphSvgEl.appendChild(path);
-
-      const labelX = x1 + 12; // keep label aligned with donor
-      const labelY = y1 - 6; // slight upward nudge to clear the stroke
-      addLabel(labelX, labelY, "start", `${amt}g`);
-
-      const prevSum = recipientSums.get(j) ?? 0;
-      recipientSums.set(j, prevSum + amt);
-    }
+    const prevSum = recipientSums.get(toIdx) ?? 0;
+    recipientSums.set(toIdx, prevSum + amt);
   }
 
   for (const [toIdx, total] of recipientSums.entries()) {
