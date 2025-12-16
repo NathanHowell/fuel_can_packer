@@ -90,6 +90,8 @@
   .cell[data-fill-state="overflow"],
   .node[data-fill-state="overflow"] {
     @apply border-[var(--color-danger)];
+    background: color-mix(in hsl, var(--color-danger) 12%, white);
+    background: color-mix(in oklch, var(--color-danger) 12%, white);
   }
 
   .cell[data-fill-state="overflow"]::before {
@@ -98,6 +100,8 @@
 
   .cell[data-fill-state="underflow"] {
     @apply border-[var(--color-warning)];
+    background: color-mix(in hsl, var(--color-warning) 12%, white);
+    background: color-mix(in oklch, var(--color-warning) 12%, white);
   }
 
   .cell[data-fill-state="underflow"]::before {
