@@ -74,7 +74,7 @@ const recipientColumnEl = document.getElementById("recipient-column") as HTMLDiv
 const graphGridEl = document.querySelector<HTMLDivElement>(".graph-grid");
 const graphSvgEl = document.getElementById("graph-svg") as unknown as SVGSVGElement;
 const outputEl = document.getElementById("output") as HTMLPreElement;
-const inputErrorsEl = document.getElementById("input-errors") as HTMLDivElement;
+const inputErrorsEl = document.getElementById("input-errors") as HTMLDivElement | null;
 const overflowErrorEl = document.querySelector<HTMLDivElement>('[data-error="overflow"]');
 const underflowErrorEl = document.querySelector<HTMLDivElement>('[data-error="underflow"]');
 let computeTimer: number | null = null;
@@ -102,8 +102,8 @@ function createCell(specKey: string): { cell: HTMLDivElement; input: HTMLInputEl
 
   if (!cellTemplateEl?.content) {return fallback();}
   const fragment = cellTemplateEl.content.cloneNode(true) as DocumentFragment;
-  const cell = fragment.querySelector(".cell") as HTMLDivElement | null;
-  const input = fragment.querySelector("input") as HTMLInputElement | null;
+  const cell = fragment.querySelector<HTMLDivElement>(".cell");
+  const input = fragment.querySelector<HTMLInputElement>("input");
   if (!cell || !input) {return fallback();}
   input.dataset["spec"] = specKey;
   return { cell, input };
@@ -116,10 +116,10 @@ function bindCell(
   specKey: string
 ): void {
   input.dataset["spec"] = specKey;
-  if (!input.name) {input.name = nextInputName(specKey);}
-  if (!input.placeholder) {input.placeholder = "Gross weight (g)";}
-  input.min = input.min || "0";
-  input.step = input.step || "1";
+  if (input.name === "") {input.name = nextInputName(specKey);}
+  if (input.placeholder === "") {input.placeholder = "Gross weight (g)";}
+  if (input.min === "") {input.min = "0";}
+  if (input.step === "") {input.step = "1";}
 
   input.addEventListener("input", () => {
     updateCellFill(cell, input);
@@ -165,10 +165,10 @@ function createColumn(spec: CanSpec): { column: HTMLDivElement; cellsContainer: 
 
   if (!columnTemplateEl?.content) {return fallback();}
   const fragment = columnTemplateEl.content.cloneNode(true) as DocumentFragment;
-  const column = fragment.querySelector(".column") as HTMLDivElement | null;
-  const cellsContainer = fragment.querySelector(".cells") as HTMLDivElement | null;
-  const heading = fragment.querySelector('[data-part="name"]') as HTMLElement | null;
-  const hint = fragment.querySelector('[data-part="hint"]') as HTMLElement | null;
+  const column = fragment.querySelector<HTMLDivElement>(".column");
+  const cellsContainer = fragment.querySelector<HTMLDivElement>(".cells");
+  const heading = fragment.querySelector<HTMLElement>('[data-part="name"]');
+  const hint = fragment.querySelector<HTMLElement>('[data-part="hint"]');
   if (!column || !cellsContainer || !heading || !hint) {return fallback();}
 
   column.dataset["spec"] = spec.key;
@@ -274,7 +274,9 @@ async function runCompute(): Promise<void> {
     if (requestId !== computeGeneration) {return;}
     statusEl.textContent = "Add gross weights to compute";
     statusEl.classList.remove("error");
-    inputErrorsEl?.setAttribute("data-visible", "false");
+    if (inputErrorsEl !== null) {
+      inputErrorsEl.setAttribute("data-visible", "false");
+    }
     resultsEl.setAttribute("data-visible", "false");
     donorColumnEl.innerHTML = "";
     recipientColumnEl.innerHTML = "";
@@ -286,7 +288,7 @@ async function runCompute(): Promise<void> {
   if (foundUnderflow || foundOverflow) {
     statusEl.textContent = "Invalid input found. Fix the highlighted cans.";
     statusEl.classList.add("error");
-    if (inputErrorsEl) {
+    if (inputErrorsEl !== null) {
       inputErrorsEl.setAttribute("data-visible", "true");
       if (overflowErrorEl) {
         overflowErrorEl.style.display = foundOverflow ? "block" : "none";
@@ -305,7 +307,9 @@ async function runCompute(): Promise<void> {
 
   statusEl.textContent = "Solving…";
   statusEl.classList.remove("error");
-  inputErrorsEl?.setAttribute("data-visible", "false");
+  if (inputErrorsEl !== null) {
+    inputErrorsEl.setAttribute("data-visible", "false");
+  }
   resultsEl.setAttribute("data-visible", "false");
 
   try {
@@ -404,7 +408,7 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
   graphSvgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
   const recipientSums = new Map<number, number>();
 
-  type EdgeRender = {
+  interface EdgeRender {
     fromIdx: number;
     toIdx: number;
     amt: number;
@@ -413,7 +417,7 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
     x2: number;
     y2: number;
     labelOffset: number;
-  };
+  }
   const edgesToRender: EdgeRender[] = [];
 
   // Collect all edges with geometry
