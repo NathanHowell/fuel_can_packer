@@ -132,20 +132,7 @@ function bindCell(
       appendCell(cellsContainer, specKey);
     }
 
-    const updatedInputs = Array.from(
-      cellsContainer.querySelectorAll<HTMLInputElement>(".cell input")
-    );
-    while (updatedInputs.length > 1) {
-      const last = updatedInputs.at(-1);
-      const prev = updatedInputs.at(-2);
-      if (!last || !prev) {break;}
-      if (last.value === "" && prev.value === "") {
-        last.parentElement?.remove();
-        updatedInputs.pop();
-        continue;
-      }
-      break;
-    }
+    cleanupEmptyCells(cellsContainer);
 
     scheduleCompute();
   });
@@ -196,6 +183,28 @@ function appendCell(cellsContainer: Element, specKey: string): void {
   const { cell, input } = createCell(specKey);
   cellsContainer.appendChild(cell);
   bindCell(cellsContainer, cell, input, specKey);
+}
+
+function cleanupEmptyCells(cellsContainer: Element): void {
+  const inputs = Array.from(
+    cellsContainer.querySelectorAll<HTMLInputElement>(".cell input")
+  );
+  if (inputs.length === 0) {return;}
+
+  let lastFilled = -1;
+  inputs.forEach((input, idx) => {
+    if (input.value.trim() !== "") {lastFilled = idx;}
+  });
+
+  const keepEmptyIdx = Math.min(Math.max(0, lastFilled + 1), inputs.length - 1);
+
+  for (let i = inputs.length - 1; i >= 0; i--) {
+    const input = inputs[i];
+    if (!input) {continue;}
+    if (input.value.trim() === "" && i !== keepEmptyIdx) {
+      input.closest(".cell")?.remove();
+    }
+  }
 }
 
 function renderColumns(): void {
