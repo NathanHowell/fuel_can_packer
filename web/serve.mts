@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-import { createServer } from "node:http";
+import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const port = process.env.PORT || 3000;
+const port = Number(process.env["PORT"]) || 3000;
 const root = fileURLToPath(new URL(".", import.meta.url));
 
-const mime = {
+const mime: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".mjs": "application/javascript; charset=utf-8",
@@ -18,9 +18,16 @@ const mime = {
   ".txt": "text/plain; charset=utf-8",
 };
 
-const server = createServer(async (req, res) => {
+const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
   try {
-    const urlPath = decodeURIComponent(new URL(req.url, `http://${req.headers.host}`).pathname);
+    const host = req.headers["host"];
+    if (!host || !req.url) {
+      res.writeHead(400);
+      res.end("Bad request");
+      return;
+    }
+
+    const urlPath = decodeURIComponent(new URL(req.url, `http://${host}`).pathname);
     const safePath = normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
     let filePath = join(root, safePath || ".");
     let info;

@@ -4,10 +4,12 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "bundle": "esbuild ./app.js --bundle --format=esm --platform=browser --define:global=globalThis --splitting --outdir=./dist --entry-names=[name] --chunk-names=chunks/[name]-[hash] --metafile=./dist/meta.json",
-    "build": "npm run bundle && node ./update-preload.mjs",
-    "build:deploy": "npm run build && node ./assemble-site.mjs",
-    "start": "node ./serve.mjs"
+    "typecheck": "tsc --noEmit",
+    "bundle": "esbuild ./app.ts --bundle --format=esm --platform=browser --define:global=globalThis --splitting --outdir=./dist --entry-names=[name] --chunk-names=chunks/[name]-[hash] --metafile=./dist/meta.json --minify --target=es2024",
+    "build": "npm run typecheck && npm run bundle && tsx ./update-preload.mts",
+    "build:deploy": "npm run build && tsx ./assemble-site.mts",
+    "start": "tsx ./serve.mts",
+    "test": "tsx ./test-solver.mts"
   },
   "keywords": [],
   "author": "",
@@ -16,6 +18,9 @@
     "z3-solver": "^4.15.4"
   },
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "@types/node": "^22.10.2",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
   }
 }

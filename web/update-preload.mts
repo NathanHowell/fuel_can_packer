@@ -2,12 +2,26 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+interface MetaOutput {
+  bytes: number;
+  inputs: Record<string, { bytesInOutput: number }>;
+  imports: Array<{ path: string; kind: string; external?: boolean }>;
+  exports: string[];
+  entryPoint?: string;
+  cssBundle?: string;
+}
+
+interface MetaJson {
+  inputs: Record<string, { bytes: number; imports: Array<{ path: string }> }>;
+  outputs: Record<string, MetaOutput>;
+}
+
 const metaPath = join(process.cwd(), "dist", "meta.json");
 const indexPath = join(process.cwd(), "index.html");
 
-async function main() {
+async function main(): Promise<void> {
   const metaRaw = await readFile(metaPath, "utf8");
-  const meta = JSON.parse(metaRaw);
+  const meta: MetaJson = JSON.parse(metaRaw);
   const chunk = Object.keys(meta.outputs || {}).find((k) => k.startsWith("dist/chunks/") && k.endsWith(".js"));
 
   const html = await readFile(indexPath, "utf8");
@@ -32,7 +46,7 @@ async function main() {
   await writeFile(indexPath, replaced, "utf8");
 }
 
-main().catch((err) => {
+main().catch((err: unknown) => {
   console.error(err);
   process.exit(1);
 });

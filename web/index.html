@@ -138,8 +138,11 @@
     .error { color: var(--danger); }
     .results {
       margin-top: 8px;
-      display: grid;
+      display: none;
       gap: 12px;
+    }
+    .results[data-visible="true"] {
+      display: grid;
     }
     .graph-panel {
       position: relative;
@@ -228,7 +231,7 @@
       <button type="submit">Compute plan</button>
       <div class="status" id="status">Ready</div>
     </form>
-    <div class="results">
+    <div class="results" id="results">
       <div class="graph-panel">
         <div class="graph-headers">
           <div>Donors</div>
@@ -242,7 +245,7 @@
         </div>
         <svg id="graph-svg"></svg>
       </div>
-      <pre class="output" id="output">Install frontend deps and build once: npm install && npm run build (run inside web/)</pre>
+      <pre class="output" id="output"></pre>
     </div>
   </div>
   <script type="module" src="./dist/app.js"></script>
