@@ -454,6 +454,7 @@ const statusEl = document.getElementById("status") as HTMLDivElement;
 const resultsEl = document.getElementById("results") as HTMLDivElement;
 const donorColumnEl = document.getElementById("donor-column") as HTMLDivElement;
 const recipientColumnEl = document.getElementById("recipient-column") as HTMLDivElement;
+const graphGridEl = document.querySelector<HTMLDivElement>(".graph-grid");
 const graphSvgEl = document.getElementById("graph-svg") as unknown as SVGSVGElement;
 const outputEl = document.getElementById("output") as HTMLPreElement;
 
@@ -589,6 +590,11 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
   donorColumnEl.innerHTML = "";
   recipientColumnEl.innerHTML = "";
   graphSvgEl.innerHTML = "";
+  if (graphGridEl && graphSvgEl.parentElement !== graphGridEl) {
+    graphGridEl.appendChild(graphSvgEl);
+    graphSvgEl.style.gridColumn = "1 / -1";
+    graphSvgEl.style.gridRow = "1 / -1";
+  }
 
   // Separate donors and recipients
   const donors: number[] = [];
@@ -650,9 +656,11 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
 }
 
 function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipients: number[]): void {
-  const svgRect = graphSvgEl.getBoundingClientRect();
-  const width = Math.max(1, Math.floor(svgRect.width));
-  const height = Math.max(1, Math.floor(svgRect.height));
+  if (!graphGridEl) {return;}
+
+  const gridRect = graphGridEl.getBoundingClientRect();
+  const width = Math.max(1, Math.floor(gridRect.width));
+  const height = Math.max(1, Math.floor(gridRect.height));
   graphSvgEl.setAttribute("width", String(width));
   graphSvgEl.setAttribute("height", String(height));
   graphSvgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
@@ -670,10 +678,10 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
       const fromRect = fromNode.getBoundingClientRect();
       const toRect = toNode.getBoundingClientRect();
 
-      const x1 = fromRect.right - svgRect.left;
-      const y1 = fromRect.top + fromRect.height / 2 - svgRect.top;
-      const x2 = toRect.left - svgRect.left;
-      const y2 = toRect.top + toRect.height / 2 - svgRect.top;
+      const x1 = fromRect.right - gridRect.left;
+      const y1 = fromRect.top + fromRect.height / 2 - gridRect.top;
+      const x2 = toRect.left - gridRect.left;
+      const y2 = toRect.top + toRect.height / 2 - gridRect.top;
 
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       const midX = (x1 + x2) / 2;
