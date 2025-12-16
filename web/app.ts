@@ -495,18 +495,31 @@ function addCell(specKey: string): void {
 
   // Add another cell when this one is filled
   input.addEventListener("input", () => {
-    if (input.value !== "" && input.placeholder === "") {
-      const cells = cellsContainer.querySelectorAll(".cell");
-      const lastCell = cells[cells.length - 1];
-      if (lastCell) {
-        const lastInput = lastCell.querySelector("input");
-        if (lastInput?.value !== "") {
-          addCell(specKey);
-        }
-      }
+    updateCellFill(cell, input);
+
+    const cells = Array.from(
+      cellsContainer.querySelectorAll<HTMLInputElement>(".cell input")
+    );
+    const lastInput = cells[cells.length - 1];
+    if (input.value !== "" && lastInput === input) {
+      addCell(specKey);
     }
 
-    updateCellFill(cell, input);
+    // Keep only one trailing empty input
+    const updatedInputs = Array.from(
+      cellsContainer.querySelectorAll<HTMLInputElement>(".cell input")
+    );
+    while (updatedInputs.length > 1) {
+      const last = updatedInputs.at(-1);
+      const prev = updatedInputs.at(-2);
+      if (!last || !prev) {break;}
+      if (last.value === "" && prev.value === "") {
+        last.parentElement?.remove();
+        updatedInputs.pop();
+        continue;
+      }
+      break;
+    }
   });
 
   cell.appendChild(input);
