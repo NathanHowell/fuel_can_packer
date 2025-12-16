@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "bundle": "esbuild ./app.ts --bundle --format=esm --platform=browser --define:global=globalThis --splitting --outdir=./dist --entry-names=[name] --chunk-names=chunks/[name]-[hash] --metafile=./dist/meta.json --minify --target=es2024",
-    "build": "npm run typecheck && npm run bundle && tsx ./update-preload.mts",
+    "bundle": "esbuild ./app.ts --bundle --format=esm --platform=browser --outdir=./dist --minify --target=es2024",
+    "build": "npm run typecheck && npm run bundle",
     "build:deploy": "npm run build && tsx ./assemble-site.mts",
     "start": "tsx ./serve.mts",
     "test": "tsx ./test-solver.mts"
@@ -14,9 +14,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "z3-solver": "^4.15.4"
-  },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "esbuild": "^0.24.0",
