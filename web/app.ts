@@ -447,10 +447,17 @@ function getFinalFuel(plan: Plan, idx: number): number {
   return plan.final_fuel[idx] ?? 0;
 }
 
+const supportsOklch = typeof CSS !== "undefined" && CSS.supports("color", "oklch(50% 0 0)");
+
 function fillColor(fuel: number, capacity: number): string {
   if (fuel > capacity) {return "var(--danger)";}
   const ratio = Math.max(0, Math.min(1, fuel / capacity));
-  const hue = 120 * ratio; // 0=red, 60=yellow, 120=green
+  if (supportsOklch) {
+    const red = "hsl(0 70% 55%)";
+    const green = "hsl(120 70% 55%)";
+    return `color-mix(in oklch, ${red} ${100 - ratio * 100}%, ${green} ${ratio * 100}%)`;
+  }
+  const hue = 120 * ratio; // fallback: 0=red, 60=yellow, 120=green
   return `hsl(${hue}, 70%, 55%)`;
 }
 
