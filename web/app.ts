@@ -678,6 +678,7 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
   graphSvgEl.setAttribute("width", String(width));
   graphSvgEl.setAttribute("height", String(height));
   graphSvgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  const recipientSums = new Map<number, number>();
 
   for (let i = 0; i < cans.length; i++) {
     for (let j = 0; j < cans.length; j++) {
@@ -700,17 +701,40 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
       const midX = (x1 + x2) / 2;
       path.setAttribute("d", `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+      path.setAttribute("fill", "none");
       path.setAttribute("class", "edge");
       graphSvgEl.appendChild(path);
 
+      const labelT = 0.24; // place label closer to the donor
+      const labelX = x1 + (x2 - x1) * labelT;
+      const labelY = y1 + (y2 - y1) * labelT - 4;
       const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      text.setAttribute("x", String(midX));
-      text.setAttribute("y", String((y1 + y2) / 2 - 4));
-      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("x", String(labelX));
+      text.setAttribute("y", String(labelY));
+      text.setAttribute("text-anchor", "start");
       text.setAttribute("class", "edge-label");
       text.textContent = `${amt}g`;
       graphSvgEl.appendChild(text);
+
+      const prevSum = recipientSums.get(j) ?? 0;
+      recipientSums.set(j, prevSum + amt);
     }
+  }
+
+  for (const [toIdx, total] of recipientSums.entries()) {
+    const toNode = recipientColumnEl.querySelector(`[data-can-id="${toIdx}"]`);
+    if (!toNode) {continue;}
+    const toRect = toNode.getBoundingClientRect();
+    const x = toRect.left - gridRect.left - 10;
+    const y = toRect.top + toRect.height / 2 - gridRect.top;
+
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", String(x));
+    text.setAttribute("y", String(y));
+    text.setAttribute("text-anchor", "end");
+    text.setAttribute("class", "edge-label");
+    text.textContent = `${total}g`;
+    graphSvgEl.appendChild(text);
   }
 }
 
