@@ -731,9 +731,8 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
       path.setAttribute("class", "edge");
       graphSvgEl.appendChild(path);
 
-      const labelT = 0.24; // place label closer to the donor
-      const labelX = x1 + (x2 - x1) * labelT;
-      const labelY = y1 + (y2 - y1) * labelT - 4;
+      const labelX = x1 + 12; // keep label aligned with donor
+      const labelY = y1 - 4;
       const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
       text.setAttribute("x", String(labelX));
       text.setAttribute("y", String(labelY));
