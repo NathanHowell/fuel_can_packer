@@ -449,12 +449,12 @@ function getFinalFuel(plan: Plan, idx: number): number {
   return plan.final_fuel[idx] ?? 0;
 }
 
-const supportsOklch = typeof CSS !== "undefined" && CSS.supports("color", "oklch(50% 0 0)");
-
 interface FillColors {
   oklch: string;
   hsl: string;
 }
+
+type FillState = "normal" | "overflow" | "underflow";
 
 function fillColors(fuel: number, capacity: number): FillColors {
   if (fuel > capacity) {
@@ -473,6 +473,32 @@ function fillColors(fuel: number, capacity: number): FillColors {
     oklch: `color-mix(in oklch, ${redOklch} ${100 - pct}%, ${greenOklch} ${pct}%)`,
     hsl: `color-mix(in hsl, ${redHsl} ${100 - pct}%, ${greenHsl} ${pct}%)`,
   };
+}
+
+function applyFillStyle(
+  el: HTMLElement,
+  fuel: number,
+  capacity: number,
+  opts?: { gross?: number; emptyWeight?: number }
+): void {
+  const pct = Math.max(0, Math.min(100, (fuel / capacity) * 100));
+  const colors = fillColors(fuel, capacity);
+  el.style.setProperty("--fill-pct", `${pct}%`);
+  el.style.setProperty("--fill-color-oklch", colors.oklch);
+  el.style.setProperty("--fill-color-hsl", colors.hsl);
+
+  let state: FillState = "normal";
+  if (opts?.gross !== undefined && opts.emptyWeight !== undefined && opts.gross < opts.emptyWeight) {
+    state = "underflow";
+  } else if (fuel > capacity) {
+    state = "overflow";
+  }
+
+  if (state === "normal") {
+    el.removeAttribute("data-fill-state");
+  } else {
+    el.setAttribute("data-fill-state", state);
+  }
 }
 
 // DOM interaction
@@ -564,14 +590,17 @@ function updateCellFill(cell: HTMLDivElement, input: HTMLInputElement): void {
   const spec = SPECS.find((s) => s.key === specKey);
   if (!spec) {return;}
 
+  if (input.value === "") {
+    cell.style.setProperty("--fill-pct", "0%");
+    cell.style.removeProperty("--fill-color-oklch");
+    cell.style.removeProperty("--fill-color-hsl");
+    cell.removeAttribute("data-fill-state");
+    return;
+  }
+
   const gross = parseFloat(input.value) || 0;
   const fuel = Math.max(0, gross - spec.emptyWeight);
-  const fillPct = (fuel / spec.capacity) * 100;
-
-  cell.style.setProperty("--fill-pct", `${Math.min(fillPct, 100)}%`);
-  const colors = fillColors(fuel, spec.capacity);
-  cell.style.setProperty("--fill-color-oklch", colors.oklch);
-  cell.style.setProperty("--fill-color-hsl", colors.hsl);
+  applyFillStyle(cell, fuel, spec.capacity, { gross, emptyWeight: spec.emptyWeight });
 }
 
 formEl.addEventListener("submit", (e: Event) => {
@@ -672,13 +701,7 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
     node.className = "node";
     node.setAttribute("data-can-id", String(idx));
 
-    const fillPct = (can.fuel / can.spec.capacity) * 100;
-    node.style.setProperty("--fill-pct", `${Math.min(fillPct, 100)}%`);
-    {
-      const colors = fillColors(can.fuel, can.spec.capacity);
-      node.style.setProperty("--fill-color-oklch", colors.oklch);
-      node.style.setProperty("--fill-color-hsl", colors.hsl);
-    }
+    applyFillStyle(node, can.fuel, can.spec.capacity);
 
     node.innerHTML = `
       <strong>Can #${idx + 1}</strong>
@@ -698,13 +721,7 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
     node.className = "node";
     node.setAttribute("data-can-id", String(idx));
 
-    const fillPct = (finalFuel / can.spec.capacity) * 100;
-    node.style.setProperty("--fill-pct", `${Math.min(fillPct, 100)}%`);
-    {
-      const colors = fillColors(finalFuel, can.spec.capacity);
-      node.style.setProperty("--fill-color-oklch", colors.oklch);
-      node.style.setProperty("--fill-color-hsl", colors.hsl);
-    }
+    applyFillStyle(node, finalFuel, can.spec.capacity);
 
     node.innerHTML = `
       <strong>Can #${idx + 1}</strong>

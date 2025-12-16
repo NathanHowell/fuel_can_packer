@@ -9,6 +9,7 @@
   --color-accent: #0066cc;
   --color-focus: #003399;
   --color-danger: #cc0000;
+  --color-warning: #c97a00;
 
   --font-sans: "Verdana", "Geneva", "Tahoma", sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
@@ -84,6 +85,23 @@
 
   .cell input:focus-visible {
     @apply outline outline-1 outline-focus border-focus;
+  }
+
+  .cell[data-fill-state="overflow"],
+  .node[data-fill-state="overflow"] {
+    @apply border-[var(--color-danger)];
+  }
+
+  .cell[data-fill-state="overflow"]::before {
+    color: var(--color-danger);
+  }
+
+  .cell[data-fill-state="underflow"] {
+    @apply border-[var(--color-warning)];
+  }
+
+  .cell[data-fill-state="underflow"]::before {
+    color: var(--color-warning);
   }
 
   button {
