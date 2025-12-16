@@ -37,7 +37,13 @@ async function main(): Promise<void> {
   await mkdir(outputDir, { recursive: true });
 
   // Copy static files from current directory
-  const staticFiles: readonly string[] = ["index.html"];
+  const staticFiles: readonly string[] = [
+    "index.html",
+    "favicon.ico",
+    "robots.txt",
+    "sitemap.xml",
+    "social-card.png",
+  ];
   for (const file of staticFiles) {
     try {
       const dest = join(outputDir, file);

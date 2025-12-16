@@ -21,6 +21,7 @@
   body {
     @apply min-h-screen bg-surface text-ink flex justify-center px-4 pt-8 pb-12 sm:px-6 font-sans;
   }
+  .muted { @apply text-muted; }
   header h1 { @apply mb-1 text-lg font-semibold tracking-tight; }
   header p { @apply mb-5 text-muted; }
   form { @apply grid gap-4; }
@@ -30,6 +31,15 @@
   .shell {
     @apply w-full max-w-[1100px] bg-panel rounded-lg p-5 shadow-none;
   }
+
+  .info {
+    @apply border border-border rounded-lg p-4 bg-white grid gap-2 mb-3;
+  }
+
+  .info h2 { @apply m-0 text-base font-semibold; }
+  .info p { @apply m-0 text-sm text-muted; }
+  .info ul { @apply m-0 pl-5 grid gap-1 list-disc; }
+  .info li { @apply text-sm text-ink; }
 
   .columns {
     @apply grid gap-3;

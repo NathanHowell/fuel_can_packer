@@ -1,7 +1,7 @@
 {
   "name": "web",
   "version": "1.0.0",
-  "description": "",
+  "description": "Fuel canister transfer calculator for MSR 110g, 227g, and 450g isobutane cans (Z3.wasm solver).",
   "type": "module",
   "scripts": {
     "lint": "eslint .",
@@ -14,7 +14,15 @@
     "start": "tsx ./serve.mts",
     "test": "tsx ./test-solver.mts"
   },
-  "keywords": [],
+  "keywords": [
+    "msr",
+    "isobutane",
+    "fuel canister",
+    "transfer calculator",
+    "z3",
+    "backpacking",
+    "weight optimization"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {

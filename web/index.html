@@ -3,15 +3,51 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Calculate the optimal way to consolidate MSR 110g, 227g, and 450g isobutane fuel canisters so you carry the fewest, lightest cans.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://fuel.for.alienz.org/">
+  <meta property="og:title" content="Fuel Canister Transfer Calculator">
+  <meta property="og:description" content="Enter gross weights for MSR 110g, 227g, and 450g isobutane canisters and get an optimal transfer plan to minimize pack weight.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://fuel.for.alienz.org/">
+  <meta property="og:image" content="https://fuel.for.alienz.org/social-card.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Fuel Canister Transfer Calculator">
+  <meta name="twitter:description" content="Optimize MSR isobutane fuel transfers (110g/227g/450g) and carry fewer cans.">
+  <meta name="twitter:image" content="https://fuel.for.alienz.org/social-card.png">
+  <meta name="theme-color" content="#f2f2f2">
   <title>Isobutane Fuel Canister Transfer Calculator</title>
   <link rel="stylesheet" href="./dist/app.css">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Fuel Canister Transfer Calculator",
+      "applicationCategory": "Utility",
+      "operatingSystem": "Web",
+      "description": "Calculate the optimal transfer plan for MSR 110g, 227g, and 450g isobutane fuel canisters to minimize weight.",
+      "url": "https://fuel.for.alienz.org/",
+      "image": "https://fuel.for.alienz.org/social-card.png"
+    }
+  </script>
 </head>
 <body>
   <div class="shell">
     <header>
+      <h1>Fuel Canister Transfer Calculator</h1>
       <p>Have too many partially used MSR canisters? Want to minimize the weight and time it takes to consolidate them?</p>
       <p>Enter the gross weight of all your canisters below and the optimal plan will be calculated for you.</p>
     </header>
+    <section class="info" aria-labelledby="how-to" hidden>
+      <h2 id="how-to">How to use the calculator</h2>
+      <p>Supported sizes: MSR isobutane fuel canisters at 110g, 227g, and 450g. Gross weight = can weight + remaining fuel.</p>
+      <ul>
+        <li>Type the gross weight (in grams) of each can by size. Add as many rows as you have cans.</li>
+        <li>The solver finds an optimal transfer plan that reduces total cans carried and empty weight.</li>
+        <li>See a donor/recipient graph, exact gram transfers, and total carry weight once inputs are valid.</li>
+      </ul>
+      <p class="muted">Tip: Values lighter than an empty can or heavier than its capacity are flagged so you can correct typos quickly.</p>
+    </section>
     <form id="pack-form">
       <div class="columns" id="columns">
       </div>
