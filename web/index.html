@@ -13,14 +13,47 @@
       <p>Enter the gross weight of all your canisters below and the optimal plan will be calculated for you.</p>
     </header>
     <form id="pack-form">
-      <div class="columns" id="columns"></div>
+      <div class="columns" id="columns">
+        <div class="column" data-spec="msr110">
+          <h2>MSR 110g</h2>
+          <p class="hint">Capacity: 110g • Empty: 101g</p>
+          <div class="cells" data-spec="msr110">
+            <div class="cell">
+              <input type="number" name="gross_msr110_0" placeholder="Gross weight (g)" min="0" step="1">
+            </div>
+          </div>
+        </div>
+        <div class="column" data-spec="msr227">
+          <h2>MSR 227g</h2>
+          <p class="hint">Capacity: 227g • Empty: 147g</p>
+          <div class="cells" data-spec="msr227">
+            <div class="cell">
+              <input type="number" name="gross_msr227_0" placeholder="Gross weight (g)" min="0" step="1">
+            </div>
+          </div>
+        </div>
+        <div class="column" data-spec="msr450">
+          <h2>MSR 450g</h2>
+          <p class="hint">Capacity: 450g • Empty: 216g</p>
+          <div class="cells" data-spec="msr450">
+            <div class="cell">
+              <input type="number" name="gross_msr450_0" placeholder="Gross weight (g)" min="0" step="1">
+            </div>
+          </div>
+        </div>
+      </div>
+      <template id="cell-template">
+        <div class="cell">
+          <input type="number" placeholder="Gross weight (g)" min="0" step="1">
+        </div>
+      </template>
       <div class="status" id="status">Ready</div>
       <div class="input-errors" id="input-errors" data-visible="false">
         <div class="error-msg" data-error="overflow">Gross weight exceeds that can’s capacity.</div>
         <div class="warn-msg" data-error="underflow">Gross weight is below the empty can weight.</div>
       </div>
     </form>
-    <div class="results" id="results">
+    <div class="results" id="results" data-visible="false">
       <div class="graph-panel">
         <div class="graph-headers">
           <div>Donors</div>
