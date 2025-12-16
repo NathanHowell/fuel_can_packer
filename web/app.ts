@@ -651,6 +651,11 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
 
 function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipients: number[]): void {
   const svgRect = graphSvgEl.getBoundingClientRect();
+  const width = Math.max(1, Math.floor(svgRect.width));
+  const height = Math.max(1, Math.floor(svgRect.height));
+  graphSvgEl.setAttribute("width", String(width));
+  graphSvgEl.setAttribute("height", String(height));
+  graphSvgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
   for (let i = 0; i < cans.length; i++) {
     for (let j = 0; j < cans.length; j++) {
