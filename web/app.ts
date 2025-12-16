@@ -471,6 +471,8 @@ const recipientColumnEl = document.getElementById("recipient-column") as HTMLDiv
 const graphGridEl = document.querySelector<HTMLDivElement>(".graph-grid");
 const graphSvgEl = document.getElementById("graph-svg") as unknown as SVGSVGElement;
 const outputEl = document.getElementById("output") as HTMLPreElement;
+let computeTimer: number | null = null;
+let computeGeneration = 0;
 
 // Initialize columns with one can type each
 function initializeColumns(): void {
@@ -535,6 +537,8 @@ function addCell(specKey: string): void {
       }
       break;
     }
+
+    scheduleCompute();
   });
 
   cell.appendChild(input);
@@ -554,9 +558,23 @@ function updateCellFill(cell: HTMLDivElement, input: HTMLInputElement): void {
   cell.style.setProperty("--fill-color", fillColor(fuel, spec.capacity));
 }
 
-formEl.addEventListener("submit", async (e: Event) => {
+formEl.addEventListener("submit", (e: Event) => {
   e.preventDefault();
+  scheduleCompute();
+});
 
+function scheduleCompute(): void {
+  if (computeTimer !== null) {
+    window.clearTimeout(computeTimer);
+  }
+  computeTimer = window.setTimeout(() => {
+    computeTimer = null;
+    runCompute();
+  }, 350);
+}
+
+async function runCompute(): Promise<void> {
+  const requestId = ++computeGeneration;
   // Gather all filled cans
   const cans: Can[] = [];
 
@@ -573,8 +591,14 @@ formEl.addEventListener("submit", async (e: Event) => {
   }
 
   if (cans.length === 0) {
-    statusEl.textContent = "Please enter at least one can";
-    statusEl.classList.add("error");
+    if (requestId !== computeGeneration) {return;}
+    statusEl.textContent = "Add gross weights to compute";
+    statusEl.classList.remove("error");
+    resultsEl.setAttribute("data-visible", "false");
+    donorColumnEl.innerHTML = "";
+    recipientColumnEl.innerHTML = "";
+    graphSvgEl.innerHTML = "";
+    outputEl.textContent = "";
     return;
   }
 
@@ -584,6 +608,7 @@ formEl.addEventListener("submit", async (e: Event) => {
 
   try {
     const { plan, cans: canObjects } = await compute(cans);
+    if (requestId !== computeGeneration) {return;}
 
     // Render graph visualization
     renderGraph(canObjects, plan);
@@ -595,10 +620,11 @@ formEl.addEventListener("submit", async (e: Event) => {
     resultsEl.setAttribute("data-visible", "true");
     statusEl.textContent = "Complete";
   } catch (err: unknown) {
+    if (requestId !== computeGeneration) {return;}
     statusEl.textContent = `Error: ${err instanceof Error ? err.message : String(err)}`;
     statusEl.classList.add("error");
   }
-});
+}
 
 function renderGraph(cans: readonly Can[], plan: Plan): void {
   donorColumnEl.innerHTML = "";
