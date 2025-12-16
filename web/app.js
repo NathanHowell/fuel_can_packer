@@ -4,10 +4,6 @@ const SPECS = [
   { key: "msr450", name: "MSR 450g", capacity: 450, emptyWeight: 216 },
 ];
 
-let z3CtxPromise = null;
-let z3ModulePromise = null;
-let z3RuntimePromise = null;
-
 function updateFillIndicator(input) {
   const cell = input.closest(".cell");
   if (!cell) return;
@@ -29,45 +25,6 @@ function updateFillIndicator(input) {
   const hue = 120 * pct; // 0=red, 120=green
   cell.style.setProperty("--fill-pct", `${(pct * 100).toFixed(1)}%`);
   cell.style.setProperty("--fill-color", `hsl(${hue}, 70%, 55%)`);
-}
-
-function ensureZ3Runtime() {
-  if (globalThis.initZ3) return Promise.resolve();
-  if (!z3RuntimePromise) {
-    z3RuntimePromise = new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/z3-solver@4.15.4/build/z3-built.js";
-      script.async = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Failed to load z3-built.js from CDN"));
-      document.head.appendChild(script);
-    });
-  }
-  return z3RuntimePromise;
-}
-
-function loadZ3() {
-  if (!z3ModulePromise) {
-    z3ModulePromise = (async () => {
-      await ensureZ3Runtime();
-      return import("z3-solver");
-    })();
-  }
-  return z3ModulePromise;
-}
-
-async function ensureCtx() {
-  if (z3CtxPromise) return z3CtxPromise;
-  z3CtxPromise = (async () => {
-    const mod = await loadZ3();
-    const init = mod.init || (mod.default && mod.default.init);
-    if (!init) throw new Error("Z3 bundle did not export init");
-    const { Context } = await init({
-      locateFile: (path) => `https://cdn.jsdelivr.net/npm/z3-solver@4.15.4/build/${path}`,
-    });
-    return new Context("fuel-can");
-  })();
-  return z3CtxPromise;
 }
 
 function buildCans(payload) {
@@ -101,119 +58,319 @@ function assignIds(cans) {
   });
 }
 
-function sum(Int, exprs) {
-  if (exprs.length === 0) return Int.val(0);
-  return exprs.reduce((acc, e) => acc.add(e));
+// Pure-JS optimizer: lexicographic comparison for [emptyCost, pairCount, transferTotal]
+function lexLess(a, b) {
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return a[i] < b[i];
+  }
+  return false;
 }
 
-async function solveWithZ3(cans) {
-  if (!cans.length) throw new Error("No cans provided");
-  const ctx = await ensureCtx();
-  const { Optimize, Int } = ctx;
-  const opt = new Optimize();
-  const n = cans.length;
-  const totalFuel = cans.reduce((acc, c) => acc + c.fuel, 0);
+// Create n×n zero matrix
+function zeros2(n) {
+  return Array.from({ length: n }, () => Array(n).fill(0));
+}
 
-  const keepVars = [];
-  const fuelVars = [];
-  const transferVars = [];
-  const pairVars = [];
+// Allocate donors to recipients minimizing transfer edges, then total grams
+function allocateMinEdgesAndMinTransfer(donors, recipients) {
+  // donors: [{ from, amt }]
+  // recipients: [{ to, cap }]  cap is remaining receivable slack for transfers
+  donors = donors.filter((d) => d.amt > 0);
+  recipients = recipients.filter((r) => r.cap > 0);
 
-  for (let d = 0; d < n; d++) {
-    const row = [];
-    const prow = [];
-    for (let r = 0; r < n; r++) {
-      const t = Int.const(`t_${d}_${r}`);
-      const p = Int.const(`p_${d}_${r}`);
-      opt.add(t.ge(0));
-      opt.add(p.ge(0));
-      opt.add(p.le(1));
-      if (d === r) {
-        opt.add(t.eq(0));
-        opt.add(p.eq(0));
-      } else {
-        const bigM = Int.val(totalFuel);
-        opt.add(t.le(p.mul(bigM)));
+  const totalNeed = donors.reduce((a, d) => a + d.amt, 0);
+  const totalCap = recipients.reduce((a, r) => a + r.cap, 0);
+  if (totalNeed === 0) return { edges: [], pairCount: 0, transferTotal: 0 };
+  if (totalNeed > totalCap) return null;
+
+  // Sort for faster search: big donors first, big recipients first.
+  donors = donors.slice().sort((a, b) => b.amt - a.amt);
+  recipients = recipients.slice().sort((a, b) => b.cap - a.cap);
+
+  const R = recipients.length;
+
+  // Upper bound: greedy
+  const greedy = (() => {
+    const caps = recipients.map((r) => r.cap);
+    const edges = [];
+    for (const d of donors) {
+      let left = d.amt;
+      while (left > 0) {
+        let best = -1;
+        for (let i = 0; i < R; i++) {
+          if (caps[i] > 0) {
+            best = i;
+            break;
+          }
+        }
+        if (best < 0) return null;
+        const take = Math.min(left, caps[best]);
+        edges.push({ from: d.from, to: recipients[best].to, amt: take });
+        caps[best] -= take;
+        left -= take;
       }
-      row.push(t);
-      prow.push(p);
     }
-    transferVars.push(row);
-    pairVars.push(prow);
-  }
+    const pairCount = edges.length; // greedy may split a lot
+    const transferTotal = totalNeed;
+    return { edges, pairCount, transferTotal };
+  })();
 
-  for (let idx = 0; idx < n; idx++) {
-    const can = cans[idx];
-    const keep = Int.const(`keep_${idx}`);
-    const fuel = Int.const(`fuel_${idx}`);
-    opt.add(keep.ge(0));
-    opt.add(keep.le(1));
-    opt.add(fuel.ge(0));
-    opt.add(fuel.le(can.spec.capacity));
-    opt.add(fuel.le(keep.mul(can.spec.capacity)));
+  if (!greedy) return null;
 
-    const inflow = sum(
-      Int,
-      transferVars.map((row) => row[idx])
-    );
-    const outflow = sum(Int, transferVars[idx]);
-    const init = Int.val(can.fuel);
-    opt.add(fuel.eq(init.add(inflow).sub(outflow)));
-    opt.add(outflow.le(init));
-
-    keepVars.push(keep);
-    fuelVars.push(fuel);
-  }
-
-  const fuelSum = sum(Int, fuelVars);
-  opt.add(fuelSum.eq(totalFuel));
-
-  const emptyTerms = keepVars.map((keep, i) => keep.mul(cans[i].spec.emptyWeight));
-  const emptyCost = sum(Int, emptyTerms);
-
-  const pairCount = sum(
-    Int,
-    pairVars.flatMap((row) => row)
+  const edgesLB = donors.length; // each donor needs at least one edge (in this transfer-only subproblem)
+  const edgesUB = Math.min(
+    greedy.pairCount,
+    donors.reduce((acc, d) => acc + Math.min(d.amt, R), 0)
   );
 
-  const transferTerms = [];
-  for (let d = 0; d < n; d++) {
-    for (let r = 0; r < n; r++) {
-      if (d === r) continue;
-      transferTerms.push(transferVars[d][r]);
+  function keyOf(idx, edgesLeft, caps) {
+    return `${idx}|${edgesLeft}|${caps.join(",")}`;
+  }
+
+  function sumTopCaps(caps, k) {
+    // caps are kept in fixed order (recipients order)
+    // take the k largest from caps (k small). Simple O(R log R) is fine for R<=16.
+    const tmp = caps.filter((c) => c > 0).sort((a, b) => b - a);
+    let s = 0;
+    for (let i = 0; i < Math.min(k, tmp.length); i++) s += tmp[i];
+    return s;
+  }
+
+  function dfs(dIdx, edgesLeft, caps, memo) {
+    if (dIdx === donors.length) return [];
+    const memoKey = keyOf(dIdx, edgesLeft, caps);
+    if (memo.has(memoKey)) return null;
+
+    const remainingDonors = donors.length - dIdx;
+    if (edgesLeft < remainingDonors) {
+      memo.set(memoKey, 1);
+      return null;
+    }
+
+    const d = donors[dIdx];
+    const need = d.amt;
+
+    // Quick impossibility: even if we use all remaining edges on this donor, can we fit?
+    const nonZeroCaps = caps.reduce((a, c) => a + (c > 0 ? 1 : 0), 0);
+    if (nonZeroCaps === 0) {
+      memo.set(memoKey, 1);
+      return null;
+    }
+    const maxPiecesHere = Math.min(
+      need, // each piece >=1g
+      nonZeroCaps,
+      edgesLeft - (remainingDonors - 1) // must leave >=1 edge for each remaining donor
+    );
+    if (maxPiecesHere <= 0) {
+      memo.set(memoKey, 1);
+      return null;
+    }
+
+    // Lower bound on pieces for this donor based on current max cap
+    const maxCapNow = Math.max(...caps);
+    const minPiecesHere = Math.max(1, Math.ceil(need / Math.max(1, maxCapNow)));
+
+    // Try fewer pieces first (minimize edge count)
+    for (let pieces = minPiecesHere; pieces <= maxPiecesHere; pieces++) {
+      // Another prune: total capacity across best 'pieces' recipients must cover need
+      if (sumTopCaps(caps, pieces) < need) continue;
+
+      // Choose 'pieces' recipient indices (combinations), biased toward larger caps.
+      const candIdxs = [];
+      for (let i = 0; i < R; i++) if (caps[i] > 0) candIdxs.push(i);
+
+      const combo = new Array(pieces);
+
+      function chooseCombo(pos, start) {
+        if (pos === pieces) {
+          // Check sum caps
+          let sum = 0;
+          for (let k = 0; k < pieces; k++) sum += caps[combo[k]];
+          if (sum < need) return null;
+
+          // Assign positive amounts to each chosen recipient summing to need.
+          // Heuristic: fill earlier recipients as much as possible.
+          const assigns = new Array(pieces).fill(0);
+
+          function assignAmounts(p, left) {
+            if (p === pieces - 1) {
+              const idx = combo[p];
+              if (left < 1 || left > caps[idx]) return null;
+              assigns[p] = left;
+              return true;
+            }
+            const idx = combo[p];
+            const capHere = caps[idx];
+
+            // Compute remaining max capacity after this slot
+            let restMax = 0;
+            for (let q = p + 1; q < pieces; q++) restMax += caps[combo[q]];
+
+            const minHere = Math.max(1, left - restMax);
+            const maxHere = Math.min(capHere, left - (pieces - p - 1)); // leave >=1 for each remaining slot
+            if (minHere > maxHere) return null;
+
+            for (let x = maxHere; x >= minHere; x--) {
+              assigns[p] = x;
+              if (assignAmounts(p + 1, left - x)) return true;
+            }
+            return null;
+          }
+
+          if (!assignAmounts(0, need)) return null;
+
+          const nextCaps = caps.slice();
+          const edgeList = [];
+          for (let k = 0; k < pieces; k++) {
+            const ridx = combo[k];
+            const amt = assigns[k];
+            nextCaps[ridx] -= amt;
+            edgeList.push({ from: d.from, to: recipients[ridx].to, amt });
+          }
+
+          const tail = dfs(dIdx + 1, edgesLeft - pieces, nextCaps, memo);
+          if (!tail) return null;
+          return edgeList.concat(tail);
+        }
+
+        for (let i = start; i <= candIdxs.length - (pieces - pos); i++) {
+          combo[pos] = candIdxs[i];
+          const res = chooseCombo(pos + 1, i + 1);
+          if (res) return res;
+        }
+        return null;
+      }
+
+      const res = chooseCombo(0, 0);
+      if (res) return res;
+    }
+
+    memo.set(memoKey, 1);
+    return null;
+  }
+
+  // Iterative deepening on edge budget to guarantee minimum pairCount
+  for (let edgeBudget = edgesLB; edgeBudget <= edgesUB; edgeBudget++) {
+    const memo = new Map();
+    const caps0 = recipients.map((r) => r.cap);
+    const edges = dfs(0, edgeBudget, caps0, memo);
+    if (edges) {
+      // Among minimal edges (this edgeBudget), transfer grams is fixed = totalNeed.
+      // Still, normalize: merge duplicates (same from/to) to keep output clean.
+      const merged = new Map();
+      for (const e of edges) {
+        const k = `${e.from}|${e.to}`;
+        merged.set(k, (merged.get(k) || 0) + e.amt);
+      }
+      const out = [];
+      for (const [k, amt] of merged.entries()) {
+        const [fromS, toS] = k.split("|");
+        out.push({ from: Number(fromS), to: Number(toS), amt });
+      }
+      out.sort((a, b) => b.amt - a.amt);
+      return { edges: out, pairCount: out.length, transferTotal: totalNeed };
     }
   }
-  const transferTotal = sum(Int, transferTerms);
 
-  opt.minimize(emptyCost);
-  opt.minimize(pairCount);
-  opt.minimize(transferTotal);
+  // Fallback (should be rare with n<=16): return greedy.
+  return greedy;
+}
 
-  const status = await opt.check();
-  if (status !== "sat") {
-    throw new Error(`Solver returned ${status}`);
+async function solveWithJS(cans) {
+  if (!cans.length) throw new Error("No cans provided");
+  if (cans.length > 16) throw new Error("Pure-JS solver supports up to 16 cans");
+
+  const n = cans.length;
+  const caps = cans.map((c) => c.spec.capacity);
+  const empties = cans.map((c) => c.spec.emptyWeight);
+  const init = cans.map((c) => c.fuel);
+  const totalFuel = init.reduce((a, b) => a + b, 0);
+
+  // totalFuel==0: choose to keep nothing (min empty cost).
+  if (totalFuel === 0) {
+    return {
+      keep: Array(n).fill(false),
+      final_fuel: Array(n).fill(0),
+      transfers: zeros2(n),
+    };
   }
-  const model = opt.model();
 
-  const intVal = (expr) => {
-    const v = model.eval(expr, true).value();
-    return typeof v === "bigint" ? Number(v) : Number(v);
-  };
+  let best = null;
 
-  const keepOut = keepVars.map((k) => intVal(k) === 1);
-  const fuelOut = fuelVars.map((f) => intVal(f));
-  const transfersOut = Array.from({ length: n }, () => Array(n).fill(0));
-  for (let d = 0; d < n; d++) {
-    for (let r = 0; r < n; r++) {
-      transfersOut[d][r] = intVal(transferVars[d][r]);
+  const maxMask = 1 << n;
+  for (let mask = 1; mask < maxMask; mask++) {
+    // capacity feasibility
+    let capSum = 0;
+    let emptyCost = 0;
+    for (let i = 0; i < n; i++) {
+      if (mask & (1 << i)) {
+        capSum += caps[i];
+        emptyCost += empties[i];
+      }
+    }
+    if (capSum < totalFuel) continue;
+
+    const keep = Array(n).fill(false);
+    for (let i = 0; i < n; i++) keep[i] = !!(mask & (1 << i));
+
+    // Baseline: keep as much of each kept can's own fuel as possible without transfers.
+    const baseline = Array(n).fill(0);
+    const slack = [];
+    for (let i = 0; i < n; i++) {
+      if (!keep[i]) continue;
+      baseline[i] = Math.min(init[i], caps[i]);
+      const s = caps[i] - baseline[i];
+      if (s > 0) slack.push({ to: i, cap: s });
+    }
+
+    // Donors for transfers:
+    // - any non-kept can must donate all its fuel
+    // - any overfull kept can donates its excess above capacity
+    const donors = [];
+    for (let i = 0; i < n; i++) {
+      if (!keep[i]) {
+        if (init[i] > 0) donors.push({ from: i, amt: init[i] });
+      } else {
+        const excess = Math.max(0, init[i] - caps[i]);
+        if (excess > 0) donors.push({ from: i, amt: excess });
+      }
+    }
+
+    const alloc = allocateMinEdgesAndMinTransfer(donors, slack);
+    if (!alloc) continue;
+
+    const transfers = zeros2(n);
+    for (const e of alloc.edges) transfers[e.from][e.to] += e.amt;
+
+    const finalFuel = Array(n).fill(0);
+    for (let i = 0; i < n; i++) finalFuel[i] = keep[i] ? baseline[i] : 0;
+    for (const e of alloc.edges) finalFuel[e.to] += e.amt;
+
+    // Sanity checks
+    for (let i = 0; i < n; i++) {
+      if (!keep[i] && finalFuel[i] !== 0) {
+        throw new Error("internal: non-kept can ended with fuel");
+      }
+      if (keep[i] && (finalFuel[i] < 0 || finalFuel[i] > caps[i])) {
+        throw new Error("internal: capacity violation");
+      }
+      const out = transfers[i].reduce((a, b) => a + b, 0);
+      if (out > init[i]) throw new Error("internal: outflow > initial fuel");
+    }
+    const sumFinal = finalFuel.reduce((a, b) => a + b, 0);
+    if (sumFinal !== totalFuel) throw new Error("internal: fuel not conserved");
+
+    const score = [emptyCost, alloc.pairCount, alloc.transferTotal];
+    if (!best || lexLess(score, best.score)) {
+      best = {
+        score,
+        plan: { keep, final_fuel: finalFuel, transfers },
+      };
     }
   }
 
-  return {
-    keep: keepOut,
-    final_fuel: fuelOut,
-    transfers: transfersOut,
-  };
+  if (!best) throw new Error("No feasible plan found (total fuel exceeds available kept capacity?)");
+  return best.plan;
 }
 
 function formatPlan(cans, plan) {
@@ -363,12 +520,7 @@ function renderGraph(cans, plan) {
 async function compute(payload) {
   const cans = buildCans(payload);
   assignIds(cans);
-  if (!window.crossOriginIsolated) {
-    throw new Error(
-      "Page is not crossOriginIsolated. Please run `npm start` from the web/ folder and open http://localhost:3000 so COOP/COEP headers enable SharedArrayBuffer (required by Z3 wasm)."
-    );
-  }
-  const plan = await solveWithZ3(cans);
+  const plan = await solveWithJS(cans);
   return { plan, cans };
 }
 
@@ -461,13 +613,6 @@ function readPayload() {
 }
 
 renderColumns();
-// Warm up the solver after initial render without blocking input.
-const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 500));
-idle(() => {
-  ensureCtx().catch(() => {
-    /* ignore warmup errors; surfaced on submit */
-  });
-});
 
 const statusEl = document.getElementById("status");
 const outputEl = document.getElementById("output");
@@ -477,7 +622,7 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   outputEl.textContent = "";
   outputEl.classList.remove("error");
-  statusEl.textContent = "Loading Z3…";
+  statusEl.textContent = "Solving…";
   try {
     const payload = readPayload();
     const { plan, cans } = await compute(payload);
