@@ -1,3 +1,5 @@
+import "./styles.css";
+
 // Types
 interface CanSpec {
   readonly key: string;

@@ -140,6 +140,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["dist/", "node_modules/", "_site/"],
+    ignores: ["dist/", "node_modules/", "_site/", "postcss.config.cjs", "tailwind.config.cjs"],
   }
 );
