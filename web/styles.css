@@ -213,10 +213,32 @@
     @apply mt-2 flex items-center gap-2 text-sm font-mono border border-border rounded-lg px-3 py-2 bg-white;
   }
 
-  .status-icon { @apply text-base; }
+  .status-icon { @apply text-base w-5 h-5 inline-flex items-center justify-center; }
+  .status-icon::before { content: "•"; display: block; }
+  .status-row[data-state="idle"] .status-icon::before { content: "•"; }
+  .status-row[data-state="solving"] .status-icon::before {
+    content: "⠋";
+    animation: spinner-frames 0.9s steps(10) infinite;
+  }
+  .status-row[data-state="success"] .status-icon::before { content: "✅"; }
+  .status-row[data-state="error"] .status-icon::before { content: "⚠️"; }
 
   .status-row[data-state="idle"] { @apply text-muted; }
   .status-row[data-state="solving"] { color: var(--color-accent); }
   .status-row[data-state="success"] { color: #0f8f3a; }
   .status-row[data-state="error"] { color: var(--color-danger); }
+}
+
+@keyframes spinner-frames {
+  0% { content: "⠋"; }
+  10% { content: "⠙"; }
+  20% { content: "⠹"; }
+  30% { content: "⠸"; }
+  40% { content: "⠼"; }
+  50% { content: "⠴"; }
+  60% { content: "⠦"; }
+  70% { content: "⠧"; }
+  80% { content: "⠇"; }
+  90% { content: "⠏"; }
+  100% { content: "⠋"; }
 }

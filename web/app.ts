@@ -77,49 +77,17 @@ const inputErrorsEl = document.getElementById("input-errors") as HTMLDivElement 
 const overflowErrorEl = document.querySelector<HTMLDivElement>('[data-error="overflow"]');
 const underflowErrorEl = document.querySelector<HTMLDivElement>('[data-error="underflow"]');
 const statusRowEl = document.getElementById("status-row") as HTMLDivElement | null;
-const statusIconEl = document.getElementById("status-icon") as HTMLDivElement | null;
 const statusTextEl = document.getElementById("status-text") as HTMLDivElement | null;
 let computeTimer: number | null = null;
 let computeGeneration = 0;
-let spinnerTimer: number | null = null;
-let spinnerFrame = 0;
 
 type StatusState = "idle" | "solving" | "success" | "error";
 
-const spinnerFrames: readonly string[] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
-function stopSpinner(): void {
-  if (spinnerTimer !== null) {
-    window.clearInterval(spinnerTimer);
-    spinnerTimer = null;
-  }
-}
-
 function setStatus(state: StatusState, message: string): void {
-  if (!statusRowEl || !statusIconEl || !statusTextEl) {return;}
+  if (!statusRowEl || !statusTextEl) {return;}
 
   statusRowEl.setAttribute("data-state", state);
   statusTextEl.textContent = message;
-
-  stopSpinner();
-
-  if (state === "solving") {
-    spinnerFrame = 0;
-    statusIconEl.textContent = spinnerFrames[spinnerFrame];
-    spinnerTimer = window.setInterval(() => {
-      spinnerFrame = (spinnerFrame + 1) % spinnerFrames.length;
-      statusIconEl.textContent = spinnerFrames[spinnerFrame];
-    }, 90);
-    return;
-  }
-
-  if (state === "success") {
-    statusIconEl.textContent = "✅";
-  } else if (state === "error") {
-    statusIconEl.textContent = "⚠️";
-  } else {
-    statusIconEl.textContent = "•";
-  }
 }
 
 let inputNameCounter = 0;
