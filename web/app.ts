@@ -569,7 +569,7 @@ function scheduleCompute(): void {
   }
   computeTimer = window.setTimeout(() => {
     computeTimer = null;
-    runCompute();
+    void runCompute();
   }, 350);
 }
 
