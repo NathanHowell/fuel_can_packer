@@ -451,16 +451,28 @@ function getFinalFuel(plan: Plan, idx: number): number {
 
 const supportsOklch = typeof CSS !== "undefined" && CSS.supports("color", "oklch(50% 0 0)");
 
-function fillColor(fuel: number, capacity: number): string {
-  if (fuel > capacity) {return "var(--danger)";}
-  const ratio = Math.max(0, Math.min(1, fuel / capacity));
-  if (supportsOklch) {
-    const red = "hsl(0 70% 55%)";
-    const green = "hsl(120 70% 55%)";
-    return `color-mix(in oklch, ${red} ${100 - ratio * 100}%, ${green} ${ratio * 100}%)`;
+interface FillColors {
+  oklch: string;
+  hsl: string;
+}
+
+function fillColors(fuel: number, capacity: number): FillColors {
+  if (fuel > capacity) {
+    return { oklch: "var(--color-danger)", hsl: "var(--color-danger)" };
   }
-  const hue = 120 * ratio; // fallback: 0=red, 60=yellow, 120=green
-  return `hsl(${hue}, 70%, 55%)`;
+
+  const ratio = Math.max(0, Math.min(1, fuel / capacity));
+  const pct = ratio * 100;
+
+  const redOklch = "oklch(0.62 0.24 29)";
+  const greenOklch = "oklch(0.77 0.19 142)";
+  const redHsl = "hsl(0 70% 55%)";
+  const greenHsl = "hsl(120 70% 55%)";
+
+  return {
+    oklch: `color-mix(in oklch, ${redOklch} ${100 - pct}%, ${greenOklch} ${pct}%)`,
+    hsl: `color-mix(in hsl, ${redHsl} ${100 - pct}%, ${greenHsl} ${pct}%)`,
+  };
 }
 
 // DOM interaction
@@ -557,7 +569,9 @@ function updateCellFill(cell: HTMLDivElement, input: HTMLInputElement): void {
   const fillPct = (fuel / spec.capacity) * 100;
 
   cell.style.setProperty("--fill-pct", `${Math.min(fillPct, 100)}%`);
-  cell.style.setProperty("--fill-color", fillColor(fuel, spec.capacity));
+  const colors = fillColors(fuel, spec.capacity);
+  cell.style.setProperty("--fill-color-oklch", colors.oklch);
+  cell.style.setProperty("--fill-color-hsl", colors.hsl);
 }
 
 formEl.addEventListener("submit", (e: Event) => {
@@ -660,7 +674,11 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
 
     const fillPct = (can.fuel / can.spec.capacity) * 100;
     node.style.setProperty("--fill-pct", `${Math.min(fillPct, 100)}%`);
-    node.style.setProperty("--fill-color", fillColor(can.fuel, can.spec.capacity));
+    {
+      const colors = fillColors(can.fuel, can.spec.capacity);
+      node.style.setProperty("--fill-color-oklch", colors.oklch);
+      node.style.setProperty("--fill-color-hsl", colors.hsl);
+    }
 
     node.innerHTML = `
       <strong>Can #${idx + 1}</strong>
@@ -682,7 +700,11 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
 
     const fillPct = (finalFuel / can.spec.capacity) * 100;
     node.style.setProperty("--fill-pct", `${Math.min(fillPct, 100)}%`);
-    node.style.setProperty("--fill-color", fillColor(finalFuel, can.spec.capacity));
+    {
+      const colors = fillColors(finalFuel, can.spec.capacity);
+      node.style.setProperty("--fill-color-oklch", colors.oklch);
+      node.style.setProperty("--fill-color-hsl", colors.hsl);
+    }
 
     node.innerHTML = `
       <strong>Can #${idx + 1}</strong>

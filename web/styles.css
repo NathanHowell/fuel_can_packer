@@ -56,7 +56,8 @@
     border-radius: 0.5rem;
     width: var(--fill-pct, 0%);
     max-width: calc(100% - 12px);
-    background: var(--fill-color, transparent);
+    background: var(--fill-color-hsl, transparent);
+    background: var(--fill-color-oklch, var(--fill-color-hsl, transparent));
     opacity: 0.28;
     pointer-events: none;
     transition: width 120ms ease, background-color 120ms ease, opacity 120ms ease;
@@ -145,7 +146,8 @@
     border-radius: 0.5rem;
     width: var(--fill-pct, 0%);
     max-width: calc(100% - 12px);
-    background: var(--fill-color, transparent);
+    background: var(--fill-color-hsl, transparent);
+    background: var(--fill-color-oklch, var(--fill-color-hsl, transparent));
     opacity: 0.25;
     pointer-events: none;
   }
