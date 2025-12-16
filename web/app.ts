@@ -447,6 +447,13 @@ function getFinalFuel(plan: Plan, idx: number): number {
   return plan.final_fuel[idx] ?? 0;
 }
 
+function fillColor(fuel: number, capacity: number): string {
+  if (fuel > capacity) {return "var(--danger)";}
+  const ratio = Math.max(0, Math.min(1, fuel / capacity));
+  const hue = 120 * ratio; // 0=red, 60=yellow, 120=green
+  return `hsl(${hue}, 70%, 55%)`;
+}
+
 // DOM interaction
 const formEl = document.getElementById("pack-form") as HTMLFormElement;
 const columnsEl = document.getElementById("columns") as HTMLDivElement;
@@ -537,7 +544,7 @@ function updateCellFill(cell: HTMLDivElement, input: HTMLInputElement): void {
   const fillPct = (fuel / spec.capacity) * 100;
 
   cell.style.setProperty("--fill-pct", `${Math.min(fillPct, 100)}%`);
-  cell.style.setProperty("--fill-color", fillPct > 100 ? "var(--danger)" : "var(--accent)");
+  cell.style.setProperty("--fill-color", fillColor(fuel, spec.capacity));
 }
 
 formEl.addEventListener("submit", async (e: Event) => {
@@ -618,7 +625,7 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
 
     const fillPct = (can.fuel / can.spec.capacity) * 100;
     node.style.setProperty("--fill-pct", `${Math.min(fillPct, 100)}%`);
-    node.style.setProperty("--fill-color", "var(--accent)");
+    node.style.setProperty("--fill-color", fillColor(can.fuel, can.spec.capacity));
 
     node.innerHTML = `
       <strong>Can #${idx + 1}</strong>
@@ -640,7 +647,7 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
 
     const fillPct = (finalFuel / can.spec.capacity) * 100;
     node.style.setProperty("--fill-pct", `${Math.min(fillPct, 100)}%`);
-    node.style.setProperty("--fill-color", "var(--accent)");
+    node.style.setProperty("--fill-color", fillColor(finalFuel, can.spec.capacity));
 
     node.innerHTML = `
       <strong>Can #${idx + 1}</strong>
