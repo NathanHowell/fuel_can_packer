@@ -511,6 +511,9 @@ const recipientColumnEl = document.getElementById("recipient-column") as HTMLDiv
 const graphGridEl = document.querySelector<HTMLDivElement>(".graph-grid");
 const graphSvgEl = document.getElementById("graph-svg") as unknown as SVGSVGElement;
 const outputEl = document.getElementById("output") as HTMLPreElement;
+const inputErrorsEl = document.getElementById("input-errors") as HTMLDivElement;
+const overflowErrorEl = document.querySelector<HTMLDivElement>('[data-error="overflow"]');
+const underflowErrorEl = document.querySelector<HTMLDivElement>('[data-error="underflow"]');
 let computeTimer: number | null = null;
 let computeGeneration = 0;
 
@@ -622,6 +625,8 @@ async function runCompute(): Promise<void> {
   const requestId = ++computeGeneration;
   // Gather all filled cans
   const cans: Can[] = [];
+  let foundUnderflow = false;
+  let foundOverflow = false;
 
   for (const spec of SPECS) {
     const cells = columnsEl.querySelectorAll<HTMLInputElement>(`.cells[data-spec="${spec.key}"] input`);
@@ -630,6 +635,8 @@ async function runCompute(): Promise<void> {
       const gross = parseFloat(input.value);
       if (!isNaN(gross) && gross > 0) {
         const fuel = Math.max(0, gross - spec.emptyWeight);
+        if (gross < spec.emptyWeight) {foundUnderflow = true;}
+        if (fuel > spec.capacity) {foundOverflow = true;}
         cans.push({ id: -1, spec, fuel, gross });
       }
     }
@@ -639,6 +646,27 @@ async function runCompute(): Promise<void> {
     if (requestId !== computeGeneration) {return;}
     statusEl.textContent = "Add gross weights to compute";
     statusEl.classList.remove("error");
+    inputErrorsEl?.setAttribute("data-visible", "false");
+    resultsEl.setAttribute("data-visible", "false");
+    donorColumnEl.innerHTML = "";
+    recipientColumnEl.innerHTML = "";
+    graphSvgEl.innerHTML = "";
+    outputEl.textContent = "";
+    return;
+  }
+
+  if (foundUnderflow || foundOverflow) {
+    statusEl.textContent = "Invalid input found. Fix the highlighted cans.";
+    statusEl.classList.add("error");
+    if (inputErrorsEl) {
+      inputErrorsEl.setAttribute("data-visible", "true");
+      if (overflowErrorEl) {
+        overflowErrorEl.style.display = foundOverflow ? "block" : "none";
+      }
+      if (underflowErrorEl) {
+        underflowErrorEl.style.display = foundUnderflow ? "block" : "none";
+      }
+    }
     resultsEl.setAttribute("data-visible", "false");
     donorColumnEl.innerHTML = "";
     recipientColumnEl.innerHTML = "";
@@ -649,6 +677,7 @@ async function runCompute(): Promise<void> {
 
   statusEl.textContent = "Solving…";
   statusEl.classList.remove("error");
+  inputErrorsEl?.setAttribute("data-visible", "false");
   resultsEl.setAttribute("data-visible", "false");
 
   try {

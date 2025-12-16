@@ -127,6 +127,26 @@
   .status { @apply m-0 text-sm text-muted; }
   .error { @apply text-danger; }
 
+  .input-errors {
+    @apply hidden grid gap-2;
+  }
+
+  .input-errors[data-visible="true"] {
+    @apply grid;
+  }
+
+  .input-errors .error-msg {
+    @apply border border-[var(--color-danger)] text-[var(--color-danger)] rounded-lg px-3 py-2 text-sm;
+    background: color-mix(in hsl, var(--color-danger) 12%, white);
+    background: color-mix(in oklch, var(--color-danger) 12%, white);
+  }
+
+  .input-errors .warn-msg {
+    @apply border border-[var(--color-warning)] text-[var(--color-warning)] rounded-lg px-3 py-2 text-sm;
+    background: color-mix(in hsl, var(--color-warning) 12%, white);
+    background: color-mix(in oklch, var(--color-warning) 12%, white);
+  }
+
   .results {
     @apply mt-2;
     display: none;
