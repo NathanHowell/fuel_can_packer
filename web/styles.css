@@ -214,7 +214,7 @@
   }
 
   .status-icon { @apply text-base w-5 h-5 inline-flex items-center justify-center; }
-  .status-icon::before { content: "•"; display: block; }
+  /*.status-icon::before { content: "•"; display: block; }*/
   .status-row[data-state="idle"] .status-icon::before { content: "•"; }
   .status-row[data-state="solving"] .status-icon::before {
     content: "⠋";
