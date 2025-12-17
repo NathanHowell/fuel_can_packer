@@ -14,6 +14,8 @@ const mime: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
   ".wasm": "application/wasm",
   ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".ico": "image/x-icon",
   ".svg": "image/svg+xml",
   ".txt": "text/plain; charset=utf-8",
 };
@@ -34,9 +36,20 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     try {
       info = await stat(filePath);
     } catch {
-      res.writeHead(404);
-      res.end("Not found");
-      return;
+      if (safePath === "favicon.ico") {
+        filePath = join(root, "dist", "favicon.ico");
+        try {
+          info = await stat(filePath);
+        } catch {
+          res.writeHead(404);
+          res.end("Not found");
+          return;
+        }
+      } else {
+        res.writeHead(404);
+        res.end("Not found");
+        return;
+      }
     }
     if (info.isDirectory()) {
       filePath = join(filePath, "index.html");

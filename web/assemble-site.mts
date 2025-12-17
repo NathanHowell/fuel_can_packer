@@ -39,11 +39,8 @@ async function main(): Promise<void> {
   // Copy static files from current directory
   const staticFiles: readonly string[] = [
     "index.html",
-    "favicon.ico",
     "robots.txt",
     "sitemap.xml",
-    "social-card.jpg",
-    "social-card.webp",
   ];
   for (const file of staticFiles) {
     try {
@@ -66,6 +63,21 @@ async function main(): Promise<void> {
   }
   await copyRecursive(distSrc, distDest);
   console.log("Copied dist/");
+
+  // Promote key assets to the site root for legacy/favicon consumers
+  const rootAssets: readonly string[] = ["favicon.ico", "apple-touch-icon.png"];
+  for (const file of rootAssets) {
+    const src = join(distDest, file);
+    const dest = join(outputDir, file);
+    try {
+      await copyFile(src, dest);
+      console.log(`Copied ${file} to site root`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`Warning: Failed to copy ${file} to site root: ${message}`);
+      process.exit(1);
+    }
+  }
 
   console.log(`\nBuild complete! Static site ready in ${outputDir}/`);
 }

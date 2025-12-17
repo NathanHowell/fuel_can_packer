@@ -11,7 +11,8 @@ import {
 } from "esbuild";
 import postcss from "postcss";
 import tailwindcss from "@tailwindcss/postcss";
-import { mkdir, readFile } from "node:fs/promises";
+import pngToIco from "png-to-ico";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import sharp from "sharp";
 
@@ -132,6 +133,57 @@ function createSocialCardPlugin(): Plugin {
   };
 }
 
+function createFaviconPlugin(): Plugin {
+  const sourceFilename = "favicon.png";
+  const pngOutputs: readonly { size: number; filename: string }[] = [
+    { size: 16, filename: "favicon-16x16.png" },
+    { size: 32, filename: "favicon-32x32.png" },
+    { size: 180, filename: "apple-touch-icon.png" },
+    { size: 192, filename: "favicon-192x192.png" },
+    { size: 512, filename: "favicon-512x512.png" },
+  ];
+  const icoSizes: readonly number[] = [16, 32, 48];
+  const outputDir = "dist";
+
+  return {
+    name: "favicons",
+    setup(buildCtx: PluginBuild): void {
+      buildCtx.onStart(async (): Promise<void> => {
+        const cwd = buildCtx.initialOptions.absWorkingDir ?? process.cwd();
+        const sourcePath = join(cwd, sourceFilename);
+        await mkdir(join(cwd, outputDir), { recursive: true });
+        const base = sharp(sourcePath);
+
+        await Promise.all(
+          pngOutputs.map(async ({ size, filename }) => {
+            const outputPath = join(cwd, outputDir, filename);
+            await base
+              .clone()
+              .resize(size, size, { fit: "cover", withoutEnlargement: true })
+              .toFile(outputPath);
+          }),
+        );
+
+        const icoPath = join(cwd, outputDir, "favicon.ico");
+        const icoBuffers = await Promise.all(
+          icoSizes.map(async (size) =>
+            base
+              .clone()
+              .resize(size, size, { fit: "cover", withoutEnlargement: true })
+              .png()
+              .toBuffer(),
+          ),
+        );
+        const icoFile = await pngToIco(icoBuffers);
+        await writeFile(icoPath, icoFile);
+
+        const pngNames = pngOutputs.map(({ filename }): string => filename).join(", ");
+        console.log(`Generated favicons in ${outputDir}: ${pngNames}, favicon.ico`);
+      });
+    },
+  };
+}
+
 const buildOptions: BuildOptions = {
   entryPoints: ["./app.ts", "./solver-worker.ts"],
   bundle: true,
@@ -144,7 +196,7 @@ const buildOptions: BuildOptions = {
   entryNames: "[name]",
   // eslint-disable-next-line @typescript-eslint/naming-convention
   loader: { ".css": "css" },
-  plugins: [createPostcssPlugin(), createSocialCardPlugin()],
+  plugins: [createPostcssPlugin(), createSocialCardPlugin(), createFaviconPlugin()],
   logLevel: "info",
 };
 
