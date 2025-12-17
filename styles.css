@@ -201,12 +201,12 @@
   .node-column { @apply grid gap-2 content-start; }
 
   .spacer {
-    @apply relative;
     min-height: 160px;
   }
 
   .node {
     @apply border border-border rounded-lg p-2.5 bg-white grid gap-1 relative overflow-hidden;
+    z-index: 1;
   }
 
   .node::after {
@@ -231,7 +231,10 @@
   .node strong { @apply text-sm; }
   .node .muted { @apply text-muted text-xs; }
 
-  .graph-panel svg { @apply absolute inset-0; }
+  .graph-panel svg {
+    @apply absolute inset-0;
+    z-index: 0;
+  }
   .edge {
     @apply stroke-accent fill-none;
     stroke-width: var(--edge-width, 2px);

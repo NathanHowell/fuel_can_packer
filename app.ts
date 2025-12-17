@@ -71,6 +71,7 @@ const resultsEl = document.getElementById("results") as HTMLDivElement;
 const donorColumnEl = document.getElementById("donor-column") as HTMLDivElement;
 const recipientColumnEl = document.getElementById("recipient-column") as HTMLDivElement;
 const graphGridEl = document.querySelector<HTMLDivElement>(".graph-grid");
+const graphSpacerEl = document.querySelector<HTMLDivElement>(".graph-grid .spacer");
 const graphSvgEl = document.getElementById("graph-svg") as unknown as SVGSVGElement;
 const keepListEl = document.getElementById("keep-list") as HTMLUListElement | null;
 const transferListEl = document.getElementById("transfer-list") as HTMLUListElement | null;
@@ -444,10 +445,9 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
   donorColumnEl.innerHTML = "";
   recipientColumnEl.innerHTML = "";
   graphSvgEl.innerHTML = "";
-  if (graphGridEl && graphSvgEl.parentElement !== graphGridEl) {
-    graphGridEl.appendChild(graphSvgEl);
-    graphSvgEl.style.gridColumn = "1 / -1";
-    graphSvgEl.style.gridRow = "1 / -1";
+  const svgParent = graphSpacerEl ?? graphGridEl;
+  if (svgParent && graphSvgEl.parentElement !== svgParent) {
+    svgParent.appendChild(graphSvgEl);
   }
 
   // Separate donors and recipients
@@ -522,8 +522,12 @@ function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipient
   const donorTargets = new Map<number, Set<number>>();
   const recipientSources = new Map<number, Set<number>>();
   const canNums = cans.map((can) => can.id);
-  const donorNumsAll = donors.map((idx) => canNums[idx]);
-  const recipientNumsAll = recipients.map((idx) => canNums[idx]);
+  const donorNumsAll = donors
+    .map((idx) => canNums[idx])
+    .filter((num): num is number => num !== undefined);
+  const recipientNumsAll = recipients
+    .map((idx) => canNums[idx])
+    .filter((num): num is number => num !== undefined);
 
   interface EdgeRender {
     fromIdx: number;
@@ -552,6 +556,7 @@ function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipient
 
       const fromNum = canNums[i];
       const toNum = canNums[j];
+      if (fromNum === undefined || toNum === undefined) {continue;}
       const fromRect = fromNode.getBoundingClientRect();
       const toRect = toNode.getBoundingClientRect();
       const x1 = fromRect.right - gridRect.left;
