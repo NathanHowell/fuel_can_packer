@@ -56,7 +56,7 @@ function createPostcssPlugin(): Plugin {
 }
 
 const buildOptions: BuildOptions = {
-  entryPoints: ["./app.ts"],
+  entryPoints: ["./app.ts", "./solver-worker.ts"],
   bundle: true,
   format: "esm",
   platform: "browser",
@@ -64,7 +64,7 @@ const buildOptions: BuildOptions = {
   outdir: "dist",
   sourcemap: true,
   minify,
-  entryNames: "app",
+  entryNames: "[name]",
   // eslint-disable-next-line @typescript-eslint/naming-convention
   loader: { ".css": "css" },
   plugins: [createPostcssPlugin()],

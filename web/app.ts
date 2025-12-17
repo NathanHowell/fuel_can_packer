@@ -1,5 +1,5 @@
 import "./styles.css";
-import { computePlan, SPECS, type Can, type Plan, type CanSpec } from "./solver";
+import { SPECS, type Can, type Plan, type CanSpec } from "./solver";
 
 function getTransferAmount(plan: Plan, from: number, to: number): number {
   const row = plan.transfers[from];
@@ -79,9 +79,28 @@ const underflowErrorEl = document.querySelector<HTMLDivElement>('[data-error="un
 const statusRowEl = document.getElementById("status-row") as HTMLDivElement | null;
 const statusTextEl = document.getElementById("status-text") as HTMLDivElement | null;
 let computeTimer: number | null = null;
-let computeGeneration = 0;
+let currentRequestId = 0;
+let pendingWorker: Worker | null = null;
 
 type StatusState = "idle" | "solving" | "success" | "error";
+
+interface WorkerRequest {
+  readonly requestId: number;
+  readonly cans: readonly Can[];
+}
+
+type WorkerResponse =
+  | {
+      readonly requestId: number;
+      readonly ok: true;
+      readonly plan: Plan;
+      readonly cans: readonly Can[];
+    }
+  | {
+      readonly requestId: number;
+      readonly ok: false;
+      readonly error: string;
+    };
 
 function setStatus(state: StatusState, message: string): void {
   if (!statusRowEl || !statusTextEl) {return;}
@@ -259,8 +278,67 @@ function scheduleCompute(): void {
   }, 350);
 }
 
+function terminatePendingWorker(): void {
+  if (pendingWorker) {
+    pendingWorker.terminate();
+    pendingWorker = null;
+  }
+}
+
+function startWorkerSolve(requestId: number, cans: Can[]): void {
+  const worker = new Worker(new URL("./solver-worker.js", import.meta.url), { type: "module" });
+  pendingWorker = worker;
+
+  const handleMessage = (event: MessageEvent<WorkerResponse>): void => {
+    const data = event.data;
+    const isCurrent = data.requestId === currentRequestId;
+    cleanup();
+
+    if (!isCurrent) {
+      return;
+    }
+
+    if (data.ok) {
+      const { plan, cans: canObjects } = data;
+      renderGraph(canObjects, plan);
+      renderTextOutput(canObjects, plan);
+      resultsEl.setAttribute("data-visible", "true");
+      setStatus("success", "Complete");
+    } else {
+      setStatus("error", `Error: ${data.error}`);
+    }
+  };
+
+  const handleError = (event: ErrorEvent | MessageEvent<unknown>): void => {
+    const isCurrent = requestId === currentRequestId;
+    const message = event instanceof ErrorEvent ? event.message : "Worker error";
+    cleanup();
+    if (!isCurrent) {
+      return;
+    }
+    setStatus("error", `Error: ${message}`);
+  };
+
+  const cleanup = (): void => {
+    worker.removeEventListener("message", handleMessage);
+    worker.removeEventListener("error", handleError);
+    worker.removeEventListener("messageerror", handleError);
+    worker.terminate();
+    if (pendingWorker === worker) {
+      pendingWorker = null;
+    }
+  };
+
+  worker.addEventListener("message", handleMessage);
+  worker.addEventListener("error", handleError);
+  worker.addEventListener("messageerror", handleError);
+
+  worker.postMessage({ requestId, cans } satisfies WorkerRequest);
+}
+
 async function runCompute(): Promise<void> {
-  const requestId = ++computeGeneration;
+  const requestId = ++currentRequestId;
+  terminatePendingWorker();
   // Gather all filled cans
   const cans: Can[] = [];
   let foundUnderflow = false;
@@ -281,7 +359,7 @@ async function runCompute(): Promise<void> {
   }
 
   if (cans.length === 0) {
-    if (requestId !== computeGeneration) {return;}
+    if (requestId !== currentRequestId) {return;}
     setStatus("idle", "Add gross weights to compute");
     if (inputErrorsEl !== null) {
       inputErrorsEl.setAttribute("data-visible", "false");
@@ -295,6 +373,7 @@ async function runCompute(): Promise<void> {
   }
 
   if (foundUnderflow || foundOverflow) {
+    if (requestId !== currentRequestId) {return;}
     setStatus("error", "Invalid input found. Fix the highlighted cans.");
     if (inputErrorsEl !== null) {
       inputErrorsEl.setAttribute("data-visible", "true");
@@ -319,23 +398,7 @@ async function runCompute(): Promise<void> {
   }
   resultsEl.setAttribute("data-visible", "false");
 
-  try {
-    const { plan, cans: canObjects } = await computePlan(cans);
-    if (requestId !== computeGeneration) {return;}
-
-    // Render graph visualization
-    renderGraph(canObjects, plan);
-
-    // Render text output
-    renderTextOutput(canObjects, plan);
-
-    // Show results using CSS data attribute
-    resultsEl.setAttribute("data-visible", "true");
-    setStatus("success", "Complete");
-  } catch (err: unknown) {
-    if (requestId !== computeGeneration) {return;}
-    setStatus("error", `Error: ${err instanceof Error ? err.message : String(err)}`);
-  }
+  startWorkerSolve(requestId, cans);
 }
 
 function renderGraph(cans: readonly Can[], plan: Plan): void {
