@@ -109,15 +109,6 @@ function setStatus(state: StatusState, message: string): void {
   statusTextEl.textContent = message;
 }
 
-const waitForFontsReady = (() => {
-  let readyPromise: Promise<void> | null = null;
-  return (): Promise<void> => {
-    if (readyPromise) {return readyPromise;}
-    readyPromise = document.fonts.ready.then(() => undefined);
-    return readyPromise;
-  };
-})();
-
 let inputNameCounter = 0;
 
 function nextInputName(specKey: string): string {
@@ -478,9 +469,7 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
   }
 
   // Draw transfer edges
-  void waitForFontsReady().then(() => {
-    window.requestAnimationFrame(() => drawEdges(cans, plan, donors, recipients));
-  });
+  window.requestAnimationFrame(() => drawEdges(cans, plan, donors, recipients));
 }
 
 function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipients: number[]): void {
@@ -557,17 +546,6 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
 
     group.appendChild(text);
     graphSvgEl.appendChild(group);
-
-    const bbox = text.getBBox();
-    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    rect.setAttribute("x", String(bbox.x - 4));
-    rect.setAttribute("y", String(bbox.y - 2));
-    rect.setAttribute("width", String(bbox.width + 8));
-    rect.setAttribute("height", String(bbox.height + 4));
-    rect.setAttribute("rx", "4");
-    rect.setAttribute("class", "edge-label-bg");
-
-    group.insertBefore(rect, text);
   }
 
   for (const edge of edgesToRender) {
