@@ -720,45 +720,49 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
 
   const donorIds = Array.from(donorTargets.keys());
   const recipientIds = Array.from(recipientSources.keys());
+  const connectionPairs: Array<{ from: number; to: number }> = [];
+  const pairSeen = new Set<string>();
+  for (const [from, targets] of donorTargets.entries()) {
+    for (const to of targets) {
+      const key = `${from}-${to}`;
+      if (!pairSeen.has(key)) {
+        pairSeen.add(key);
+        connectionPairs.push({ from, to });
+      }
+    }
+  }
 
-  const edgeHighlightSelectors = [
-    ".graph-grid .edge:hover",
-    ...donorIds.map((id) => `.graph-grid:has(.donor-node[data-can-id="${id}"]:hover) .edge[data-from="${id}"]`),
-    ...recipientIds.map((id) => `.graph-grid:has(.recipient-node[data-can-id="${id}"]:hover) .edge[data-to="${id}"]`),
-  ];
+  const edgeHighlightSelectors = new Set<string>();
+  edgeHighlightSelectors.add(".graph-grid .edge:hover");
+  donorIds.forEach((id) => edgeHighlightSelectors.add(`.graph-grid:has(.donor-node[data-can-id="${id}"]:hover) .edge[data-from="${id}"]`));
+  recipientIds.forEach((id) => edgeHighlightSelectors.add(`.graph-grid:has(.recipient-node[data-can-id="${id}"]:hover) .edge[data-to="${id}"]`));
 
-  const donorHighlightSelectors = [
-    ".graph-grid .donor-node:hover",
-    ...donorIds.map((id) => `.graph-grid:has(.edge[data-from="${id}"]:hover) .donor-node[data-can-id="${id}"]`),
-    ...recipientIds.map((id) => `.graph-grid:has(.recipient-node[data-can-id="${id}"]:hover) .donor-node.link-to-${id}`),
-  ];
+  const nodeHighlightSelectors = new Set<string>();
+  // Self hover
+  nodeHighlightSelectors.add(".graph-grid .donor-node:hover");
+  nodeHighlightSelectors.add(".graph-grid .recipient-node:hover");
+  // Edge hover to nodes
+  donorIds.forEach((id) => nodeHighlightSelectors.add(`.graph-grid:has(.edge[data-from="${id}"]:hover) .donor-node[data-can-id="${id}"]`));
+  recipientIds.forEach((id) => nodeHighlightSelectors.add(`.graph-grid:has(.edge[data-to="${id}"]:hover) .recipient-node[data-can-id="${id}"]`));
+  // Node hover to opposite nodes via connections
+  connectionPairs.forEach(({ from, to }) => {
+    nodeHighlightSelectors.add(`.graph-grid:has(.donor-node[data-can-id="${from}"]:hover) .recipient-node[data-can-id="${to}"]`);
+    nodeHighlightSelectors.add(`.graph-grid:has(.recipient-node[data-can-id="${to}"]:hover) .donor-node[data-can-id="${from}"]`);
+  });
 
-  const recipientHighlightSelectors = [
-    ".graph-grid .recipient-node:hover",
-    ...recipientIds.map((id) => `.graph-grid:has(.edge[data-to="${id}"]:hover) .recipient-node[data-can-id="${id}"]`),
-    ...donorIds.map((id) => `.graph-grid:has(.donor-node[data-can-id="${id}"]:hover) .recipient-node.link-from-${id}`),
-  ];
-
-  const nodeHighlightSelectors = [...donorHighlightSelectors, ...recipientHighlightSelectors];
+  const edgeHighlightList = Array.from(edgeHighlightSelectors);
+  const nodeHighlightList = Array.from(nodeHighlightSelectors);
 
   const hoverCss = `
-${edgeHighlightSelectors.join(",\n")} {
+${edgeHighlightList.join(",\n")} {
   stroke: var(--color-focus);
   stroke-opacity: 0.95;
   filter: drop-shadow(0 0 6px rgba(0, 51, 153, 0.25));
 }
 
-${nodeHighlightSelectors.join(",\n")} {
+${nodeHighlightList.join(",\n")} {
   border-color: var(--color-focus);
   box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-focus) 35%, transparent), 0 6px 18px -12px rgba(0, 0, 0, 0.35);
-}
-
-${nodeHighlightSelectors.join(",\n")}::after {
-  opacity: 0.38;
-}
-
-${nodeHighlightSelectors.join(",\n")} strong {
-  color: var(--color-focus);
 }
 `;
 

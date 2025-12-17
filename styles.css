@@ -228,16 +228,6 @@
     box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-focus) 35%, transparent), 0 6px 18px -12px rgba(0, 0, 0, 0.35);
   }
 
-  .node:hover::after,
-  .node[data-hovered="true"]::after {
-    opacity: 0.38;
-  }
-
-  .node:hover strong,
-  .node[data-hovered="true"] strong {
-    color: var(--color-focus);
-  }
-
   .node strong { @apply text-sm; }
   .node .muted { @apply text-muted text-xs; }
 
