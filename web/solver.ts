@@ -554,7 +554,7 @@ function findBestPlan(inputs: SolverInputs, grouped: readonly GroupedCans[]): Be
   return best;
 }
 
-async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
+async function solve(cans: readonly Can[]): Promise<Plan> {
   const inputs = prepareInputs(cans);
   if (inputs.totalFuel === 0) {return emptyPlan(inputs.n);}
 
@@ -579,6 +579,6 @@ function assignIds(cans: Can[]): void {
 
 export async function computePlan(cans: readonly Can[]): Promise<SolutionResult> {
   assignIds([...cans]);
-  const plan = await solveWithJS(cans);
+  const plan = await solve(cans);
   return { plan, cans };
 }
