@@ -297,7 +297,6 @@ function allocateMinEdgesAndMinTransfer(
 
 async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
   if (!cans.length) {throw new Error("No cans provided");}
-  if (cans.length > 16) {throw new Error("Pure-JS solver supports up to 16 cans");}
 
   const n = cans.length;
   const caps = cans.map((c) => c.spec.capacity);
@@ -313,27 +312,38 @@ async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
     };
   }
 
-  let best: BestSolution | null = null;
+  const grouped = SPECS.map((spec) => ({
+    spec,
+    indices: cans
+      .map((c, idx) => ({ c, idx }))
+      .filter(({ c }) => c.spec.key === spec.key)
+      .sort((a, b) => b.c.fuel - a.c.fuel)
+      .map(({ idx }) => idx),
+  }));
 
-  const maxMask = 1 << n;
-  for (let mask = 1; mask < maxMask; mask++) {
+  const lenA = grouped[0]?.indices.length ?? 0;
+  const lenB = grouped[1]?.indices.length ?? 0;
+  const lenC = grouped[2]?.indices.length ?? 0;
+
+  const workEstimate = (lenA + 1) * (lenB + 1) * n;
+  if (workEstimate > 5_000_000) {
+    throw new Error("Too many cans for the browser solver (try reducing to ~300 cans)");
+  }
+
+  const buildPlanForKeep = (keep: readonly boolean[]): BestSolution | null => {
     let capSum = 0;
     let emptyCost = 0;
     for (let i = 0; i < n; i++) {
-      if (mask & (1 << i)) {
-        const capVal = caps[i];
-        const emptyVal = empties[i];
-        if (capVal === undefined || emptyVal === undefined) {
-          throw new Error("internal: missing can data");
-        }
-        capSum += capVal;
-        emptyCost += emptyVal;
+      if (!keep[i]) {continue;}
+      const capVal = caps[i];
+      const emptyVal = empties[i];
+      if (capVal === undefined || emptyVal === undefined) {
+        throw new Error("internal: missing can data");
       }
+      capSum += capVal;
+      emptyCost += emptyVal;
     }
-    if (capSum < totalFuel) {continue;}
-
-    const keep: boolean[] = Array<boolean>(n).fill(false);
-    for (let i = 0; i < n; i++) {keep[i] = !!(mask & (1 << i));}
+    if (capSum < totalFuel) {return null;}
 
     const baseline: number[] = Array<number>(n).fill(0);
     const slack: Recipient[] = [];
@@ -366,7 +376,7 @@ async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
     }
 
     const alloc = allocateMinEdgesAndMinTransfer(donors, slack);
-    if (!alloc) {continue;}
+    if (!alloc) {return null;}
 
     const transfers: number[][] = zeros2(n);
     for (const e of alloc.edges) {
@@ -411,11 +421,46 @@ async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
     if (sumFinal !== totalFuel) {throw new Error("internal: fuel not conserved");}
 
     const score: Score = [emptyCost, alloc.pairCount, alloc.transferTotal];
-    if (!best || lexLess(score, best.score)) {
-      best = {
-        score,
-        plan: { keep, final_fuel: finalFuel, transfers },
-      };
+    return { score, plan: { keep, final_fuel: finalFuel, transfers } };
+  };
+
+  let best: BestSolution | null = null;
+  const groupA = grouped[0];
+  const groupB = grouped[1];
+  const groupC = grouped[2];
+
+  for (let keepA = 0; keepA <= lenA; keepA++) {
+    const capA = (groupA?.spec.capacity ?? 0) * keepA;
+    const emptyA = (groupA?.spec.emptyWeight ?? 0) * keepA;
+    for (let keepB = 0; keepB <= lenB; keepB++) {
+      const capAB = capA + (groupB?.spec.capacity ?? 0) * keepB;
+      const emptyAB = emptyA + (groupB?.spec.emptyWeight ?? 0) * keepB;
+
+      const remaining = totalFuel - capAB;
+      const neededC = remaining <= 0 ? 0 : Math.ceil(remaining / (groupC?.spec.capacity ?? Infinity));
+      if (neededC > lenC) {continue;}
+
+      const emptyTotal = emptyAB + (groupC?.spec.emptyWeight ?? 0) * neededC;
+
+      if (best && emptyTotal > best.score[0] && capAB >= totalFuel) {break;}
+      if (best && emptyTotal > best.score[0]) {continue;}
+
+      const keep: boolean[] = Array<boolean>(n).fill(false);
+      if (groupA) {
+        for (const idx of groupA.indices.slice(0, keepA)) {keep[idx] = true;}
+      }
+      if (groupB) {
+        for (const idx of groupB.indices.slice(0, keepB)) {keep[idx] = true;}
+      }
+      if (groupC) {
+        for (const idx of groupC.indices.slice(0, neededC)) {keep[idx] = true;}
+      }
+
+      const candidate = buildPlanForKeep(keep);
+      if (!candidate) {continue;}
+      if (!best || lexLess(candidate.score, best.score)) {
+        best = candidate;
+      }
     }
   }
 
