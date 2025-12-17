@@ -80,6 +80,8 @@ const overflowErrorEl = document.querySelector<HTMLDivElement>('[data-error="ove
 const underflowErrorEl = document.querySelector<HTMLDivElement>('[data-error="underflow"]');
 const statusRowEl = document.getElementById("status-row") as HTMLDivElement | null;
 const statusTextEl = document.getElementById("status-text") as HTMLDivElement | null;
+const hoverStyleId = "graph-hover-style";
+let hoverStyleEl: HTMLStyleElement | null = null;
 let computeTimer: number | null = null;
 let currentRequestId = 0;
 let pendingWorker: Worker | null = null;
@@ -457,7 +459,7 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
     const can = cans[idx];
     if (!can) {continue;}
     const node = document.createElement("div");
-    node.className = "node";
+    node.className = "node donor-node";
     node.setAttribute("data-can-id", String(idx));
 
     applyFillStyle(node, can.fuel, can.spec.capacity);
@@ -477,7 +479,7 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
     if (!can) {continue;}
     const finalFuel = getFinalFuel(plan, idx);
     const node = document.createElement("div");
-    node.className = "node";
+    node.className = "node recipient-node";
     node.setAttribute("data-can-id", String(idx));
 
     applyFillStyle(node, finalFuel, can.spec.capacity);
@@ -505,6 +507,8 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
   graphSvgEl.setAttribute("height", String(height));
   graphSvgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
   const recipientSums = new Map<number, number>();
+  const donorTargets = new Map<number, Set<number>>();
+  const recipientSources = new Map<number, Set<number>>();
 
   interface EdgeRender {
     fromIdx: number;
@@ -535,6 +539,20 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
       const y1 = fromRect.top + fromRect.height / 2 - gridRect.top;
       const x2 = toRect.left - gridRect.left;
       const y2 = toRect.top + toRect.height / 2 - gridRect.top;
+
+      let targetSet = donorTargets.get(i);
+      if (!targetSet) {
+        targetSet = new Set<number>();
+        donorTargets.set(i, targetSet);
+      }
+      targetSet.add(j);
+
+      let sourceSet = recipientSources.get(j);
+      if (!sourceSet) {
+        sourceSet = new Set<number>();
+        recipientSources.set(j, sourceSet);
+      }
+      sourceSet.add(i);
 
       edgesToRender.push({
         fromIdx: i,
@@ -615,6 +633,22 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
     }
   }
 
+  // Tag nodes with connection classes for CSS-only hover highlighting.
+  for (const [fromIdx, targets] of donorTargets.entries()) {
+    const node = donorColumnEl.querySelector<HTMLElement>(`.donor-node[data-can-id="${fromIdx}"]`);
+    if (!node) {continue;}
+    for (const toIdx of targets) {
+      node.classList.add(`link-to-${toIdx}`);
+    }
+  }
+  for (const [toIdx, sources] of recipientSources.entries()) {
+    const node = recipientColumnEl.querySelector<HTMLElement>(`.recipient-node[data-can-id="${toIdx}"]`);
+    if (!node) {continue;}
+    for (const fromIdx of sources) {
+      node.classList.add(`link-from-${fromIdx}`);
+    }
+  }
+
   // Pack donors (start Y) so strokes touch at the source.
   for (const list of edgesByFrom.values()) {
     const anchorY = list[0]?.y1 ?? 0;
@@ -673,58 +707,63 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
     addLabel(x, y, "end", `${total}g`);
   }
 
-  // Hover interactions: highlight connected edges and nodes.
-  const allEdges = Array.from(graphSvgEl.querySelectorAll<SVGPathElement>(".edge"));
-  const allDonorNodes = Array.from(donorColumnEl.querySelectorAll<HTMLElement>(".node"));
-  const allRecipientNodes = Array.from(recipientColumnEl.querySelectorAll<HTMLElement>(".node"));
-
-  const clearHover = (): void => {
-    for (const el of [...allEdges, ...allDonorNodes, ...allRecipientNodes]) {
-      el.removeAttribute("data-hovered");
+  const ensureHoverStyleEl = (): HTMLStyleElement => {
+    if (hoverStyleEl && document.head.contains(hoverStyleEl)) {
+      return hoverStyleEl;
     }
+    const style = document.createElement("style");
+    style.id = hoverStyleId;
+    document.head.appendChild(style);
+    hoverStyleEl = style;
+    return style;
   };
 
-  const highlightConnection = (fromIdx?: number, toIdx?: number): void => {
-    clearHover();
-    for (const edge of allEdges) {
-      const edgeFrom = Number(edge.dataset["from"]);
-      const edgeTo = Number(edge.dataset["to"]);
-      const fromMatch = fromIdx === undefined || edgeFrom === fromIdx;
-      const toMatch = toIdx === undefined || edgeTo === toIdx;
-      if (fromMatch && toMatch) {
-        edge.setAttribute("data-hovered", "true");
-        if (!Number.isNaN(edgeFrom)) {
-          donorColumnEl.querySelector<HTMLElement>(`.node[data-can-id="${edgeFrom}"]`)?.setAttribute("data-hovered", "true");
-        }
-        if (!Number.isNaN(edgeTo)) {
-          recipientColumnEl.querySelector<HTMLElement>(`.node[data-can-id="${edgeTo}"]`)?.setAttribute("data-hovered", "true");
-        }
-      }
-    }
-  };
+  const donorIds = Array.from(donorTargets.keys());
+  const recipientIds = Array.from(recipientSources.keys());
 
-  const bindNodeHover = (node: HTMLElement, role: "donor" | "recipient"): void => {
-    const idx = Number(node.dataset["canId"]);
-    node.addEventListener("mouseenter", () => {
-      if (role === "donor") {
-        highlightConnection(idx, undefined);
-      } else {
-        highlightConnection(undefined, idx);
-      }
-    });
-    node.addEventListener("mouseleave", clearHover);
-  };
+  const edgeHighlightSelectors = [
+    ".graph-grid .edge:hover",
+    ...donorIds.map((id) => `.graph-grid:has(.donor-node[data-can-id="${id}"]:hover) .edge[data-from="${id}"]`),
+    ...recipientIds.map((id) => `.graph-grid:has(.recipient-node[data-can-id="${id}"]:hover) .edge[data-to="${id}"]`),
+  ];
 
-  allDonorNodes.forEach((node) => bindNodeHover(node, "donor"));
-  allRecipientNodes.forEach((node) => bindNodeHover(node, "recipient"));
-  allEdges.forEach((edge) => {
-    edge.addEventListener("mouseenter", () => {
-      const fromIdx = Number(edge.dataset["from"]);
-      const toIdx = Number(edge.dataset["to"]);
-      highlightConnection(Number.isNaN(fromIdx) ? undefined : fromIdx, Number.isNaN(toIdx) ? undefined : toIdx);
-    });
-    edge.addEventListener("mouseleave", clearHover);
-  });
+  const donorHighlightSelectors = [
+    ".graph-grid .donor-node:hover",
+    ...donorIds.map((id) => `.graph-grid:has(.edge[data-from="${id}"]:hover) .donor-node[data-can-id="${id}"]`),
+    ...recipientIds.map((id) => `.graph-grid:has(.recipient-node[data-can-id="${id}"]:hover) .donor-node.link-to-${id}`),
+  ];
+
+  const recipientHighlightSelectors = [
+    ".graph-grid .recipient-node:hover",
+    ...recipientIds.map((id) => `.graph-grid:has(.edge[data-to="${id}"]:hover) .recipient-node[data-can-id="${id}"]`),
+    ...donorIds.map((id) => `.graph-grid:has(.donor-node[data-can-id="${id}"]:hover) .recipient-node.link-from-${id}`),
+  ];
+
+  const nodeHighlightSelectors = [...donorHighlightSelectors, ...recipientHighlightSelectors];
+
+  const hoverCss = `
+${edgeHighlightSelectors.join(",\n")} {
+  stroke: var(--color-focus);
+  stroke-opacity: 0.95;
+  filter: drop-shadow(0 0 6px rgba(0, 51, 153, 0.25));
+}
+
+${nodeHighlightSelectors.join(",\n")} {
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-focus) 35%, transparent), 0 6px 18px -12px rgba(0, 0, 0, 0.35);
+}
+
+${nodeHighlightSelectors.join(",\n")}::after {
+  opacity: 0.38;
+}
+
+${nodeHighlightSelectors.join(",\n")} strong {
+  color: var(--color-focus);
+}
+`;
+
+  const styleEl = ensureHoverStyleEl();
+  styleEl.textContent = hoverCss;
 }
 
 function renderSolution(cans: readonly Can[], plan: Plan): void {
