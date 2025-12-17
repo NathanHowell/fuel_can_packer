@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import eslint from "@eslint/js";
+import type { Linter } from "eslint";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
+const config: Linter.Config[] = [
   eslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
@@ -141,5 +143,7 @@ export default tseslint.config(
   },
   {
     ignores: ["dist/", "node_modules/", "_site/"],
-  }
-);
+  },
+];
+
+export default config;
