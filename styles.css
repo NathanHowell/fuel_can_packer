@@ -201,6 +201,7 @@
   .node-column { @apply grid gap-2 content-start; }
 
   .spacer {
+    @apply relative;
     min-height: 160px;
   }
 
