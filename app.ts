@@ -512,12 +512,19 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
 function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipients: number[]): void {
   if (!graphGridEl) {return;}
 
+  const coordRect = graphSpacerEl?.getBoundingClientRect() ?? graphGridEl.getBoundingClientRect();
   const gridRect = graphGridEl.getBoundingClientRect();
   const width = Math.max(1, Math.floor(gridRect.width));
   const height = Math.max(1, Math.floor(gridRect.height));
+  const offsetX = gridRect.left - coordRect.left;
+  const offsetY = gridRect.top - coordRect.top;
   graphSvgEl.setAttribute("width", String(width));
   graphSvgEl.setAttribute("height", String(height));
   graphSvgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  graphSvgEl.style.left = `${offsetX}px`;
+  graphSvgEl.style.top = `${offsetY}px`;
+  graphSvgEl.style.width = `${width}px`;
+  graphSvgEl.style.height = `${height}px`;
   const recipientSums = new Map<number, number>();
   const donorTargets = new Map<number, Set<number>>();
   const recipientSources = new Map<number, Set<number>>();
