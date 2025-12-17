@@ -1,0 +1,23 @@
+/*
+  # Security Headers for Cloudflare Pages
+
+  # Content Security Policy - Prevents XSS and other injection attacks
+  # Locked down to only allow resources from same origin
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; manifest-src 'self'
+
+  # Permissions Policy - Disable all unnecessary browser features
+  # Explicitly deny: camera, microphone, geolocation, payment, USB, and many others
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), ambient-light-sensor=(), autoplay=(), battery=(), display-capture=(), document-domain=(), encrypted-media=(), fullscreen=(), gamepad=(), hid=(), idle-detection=(), interest-cohort=(), keyboard-map=(), local-fonts=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), serial=(), speaker-selection=(), sync-xhr=(), xr-spatial-tracking=()
+
+  # Prevent MIME type sniffing
+  X-Content-Type-Options: nosniff
+
+  # Control referrer information sent to other sites
+  Referrer-Policy: strict-origin-when-cross-origin
+
+  # Force HTTPS for 2 years (including subdomains)
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+
+  # Additional hardening
+  X-Frame-Options: DENY
+  X-XSS-Protection: 0

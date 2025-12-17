@@ -60,8 +60,6 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     const type = mime[extname(filePath)] ?? "application/octet-stream";
     res.writeHead(200, {
       "Content-Type": type,
-      "Cross-Origin-Embedder-Policy": "require-corp",
-      "Cross-Origin-Opener-Policy": "same-origin",
     });
     res.end(buf);
   } catch (err) {
@@ -72,5 +70,4 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
 
 server.listen(port, () => {
   console.log(`Serving ${root} on http://localhost:${port}`);
-  console.log("Headers: COOP same-origin, COEP require-corp (SharedArrayBuffer enabled)");
 });

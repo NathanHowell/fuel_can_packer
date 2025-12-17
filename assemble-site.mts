@@ -41,6 +41,7 @@ async function main(): Promise<void> {
     "index.html",
     "robots.txt",
     "sitemap.xml",
+    "_headers",
   ];
   for (const file of staticFiles) {
     try {
