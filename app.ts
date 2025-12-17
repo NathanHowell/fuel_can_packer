@@ -371,6 +371,9 @@ async function runCompute(): Promise<void> {
   const cans: Can[] = [];
   let foundUnderflow = false;
   let foundOverflow = false;
+  columnsEl.querySelectorAll<HTMLDivElement>(".cell").forEach((cell) => {
+    cell.removeAttribute("data-can-num");
+  });
 
   for (const spec of SPECS) {
     const cells = columnsEl.querySelectorAll<HTMLInputElement>(`.cells[data-spec="${spec.key}"] input`);
@@ -378,10 +381,15 @@ async function runCompute(): Promise<void> {
     for (const input of Array.from(cells)) {
       const gross = parseFloat(input.value);
       if (!isNaN(gross) && gross > 0) {
+        const cell = input.closest<HTMLDivElement>(".cell");
+        const canNum = cans.length + 1;
         const fuel = Math.max(0, gross - spec.emptyWeight);
         if (gross < spec.emptyWeight) {foundUnderflow = true;}
         if (fuel > spec.capacity) {foundOverflow = true;}
-        cans.push({ id: -1, spec, fuel, gross });
+        cans.push({ id: canNum, spec, fuel, gross });
+        if (cell) {
+          cell.dataset["canNum"] = String(canNum);
+        }
       }
     }
   }
@@ -458,14 +466,16 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
   for (const idx of donors) {
     const can = cans[idx];
     if (!can) {continue;}
+    const canNum = can.id;
     const node = document.createElement("div");
     node.className = "node donor-node";
     node.setAttribute("data-can-id", String(idx));
+    node.dataset["canNum"] = String(canNum);
 
     applyFillStyle(node, can.fuel, can.spec.capacity);
 
     node.innerHTML = `
-      <strong>Can #${idx + 1}</strong>
+      <strong>Can #${canNum}</strong>
       <div class="muted">${can.spec.name}</div>
       <div class="muted">${can.fuel}g → discarded</div>
     `;
@@ -478,14 +488,16 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
     const can = cans[idx];
     if (!can) {continue;}
     const finalFuel = getFinalFuel(plan, idx);
+    const canNum = can.id;
     const node = document.createElement("div");
     node.className = "node recipient-node";
     node.setAttribute("data-can-id", String(idx));
+    node.dataset["canNum"] = String(canNum);
 
     applyFillStyle(node, finalFuel, can.spec.capacity);
 
     node.innerHTML = `
-      <strong>Can #${idx + 1}</strong>
+      <strong>Can #${canNum}</strong>
       <div class="muted">${can.spec.name}</div>
       <div class="muted">${can.fuel}g → ${finalFuel}g</div>
     `;
@@ -497,7 +509,7 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
   window.requestAnimationFrame(() => drawEdges(cans, plan, donors, recipients));
 }
 
-function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipients: number[]): void {
+function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipients: number[]): void {
   if (!graphGridEl) {return;}
 
   const gridRect = graphGridEl.getBoundingClientRect();
@@ -509,10 +521,15 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
   const recipientSums = new Map<number, number>();
   const donorTargets = new Map<number, Set<number>>();
   const recipientSources = new Map<number, Set<number>>();
+  const canNums = cans.map((can) => can.id);
+  const donorNumsAll = donors.map((idx) => canNums[idx]);
+  const recipientNumsAll = recipients.map((idx) => canNums[idx]);
 
   interface EdgeRender {
     fromIdx: number;
     toIdx: number;
+    fromNum: number;
+    toNum: number;
     amt: number;
     x1: number;
     y1: number;
@@ -533,6 +550,8 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
       const toNode = recipientColumnEl.querySelector(`[data-can-id="${j}"]`);
       if (!fromNode || !toNode) {continue;}
 
+      const fromNum = canNums[i];
+      const toNum = canNums[j];
       const fromRect = fromNode.getBoundingClientRect();
       const toRect = toNode.getBoundingClientRect();
       const x1 = fromRect.right - gridRect.left;
@@ -540,23 +559,25 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
       const x2 = toRect.left - gridRect.left;
       const y2 = toRect.top + toRect.height / 2 - gridRect.top;
 
-      let targetSet = donorTargets.get(i);
+      let targetSet = donorTargets.get(fromNum);
       if (!targetSet) {
         targetSet = new Set<number>();
-        donorTargets.set(i, targetSet);
+        donorTargets.set(fromNum, targetSet);
       }
-      targetSet.add(j);
+      targetSet.add(toNum);
 
-      let sourceSet = recipientSources.get(j);
+      let sourceSet = recipientSources.get(toNum);
       if (!sourceSet) {
         sourceSet = new Set<number>();
-        recipientSources.set(j, sourceSet);
+        recipientSources.set(toNum, sourceSet);
       }
-      sourceSet.add(i);
+      sourceSet.add(fromNum);
 
       edgesToRender.push({
         fromIdx: i,
         toIdx: j,
+        fromNum,
+        toNum,
         amt,
         x1,
         y1,
@@ -634,18 +655,18 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
   }
 
   // Tag nodes with connection classes for CSS-only hover highlighting.
-  for (const [fromIdx, targets] of donorTargets.entries()) {
-    const node = donorColumnEl.querySelector<HTMLElement>(`.donor-node[data-can-id="${fromIdx}"]`);
+  for (const [fromNum, targets] of donorTargets.entries()) {
+    const node = donorColumnEl.querySelector<HTMLElement>(`.donor-node[data-can-num="${fromNum}"]`);
     if (!node) {continue;}
-    for (const toIdx of targets) {
-      node.classList.add(`link-to-${toIdx}`);
+    for (const toNum of targets) {
+      node.classList.add(`link-to-${toNum}`);
     }
   }
-  for (const [toIdx, sources] of recipientSources.entries()) {
-    const node = recipientColumnEl.querySelector<HTMLElement>(`.recipient-node[data-can-id="${toIdx}"]`);
+  for (const [toNum, sources] of recipientSources.entries()) {
+    const node = recipientColumnEl.querySelector<HTMLElement>(`.recipient-node[data-can-num="${toNum}"]`);
     if (!node) {continue;}
-    for (const fromIdx of sources) {
-      node.classList.add(`link-from-${fromIdx}`);
+    for (const fromNum of sources) {
+      node.classList.add(`link-from-${fromNum}`);
     }
   }
 
@@ -683,8 +704,8 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
     path.setAttribute("d", `M ${startX} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
     path.setAttribute("fill", "none");
     path.setAttribute("class", "edge");
-    path.dataset["from"] = String(edge.fromIdx);
-    path.dataset["to"] = String(edge.toIdx);
+    path.dataset["fromNum"] = String(edge.fromNum);
+    path.dataset["toNum"] = String(edge.toNum);
     path.style.setProperty("--edge-width", `${strokeWidth}px`);
     path.style.setProperty("--edge-opacity", "0.5");
     graphSvgEl.appendChild(path);
@@ -718,9 +739,9 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
     return style;
   };
 
-  const donorIds = Array.from(donorTargets.keys());
-  const recipientIds = Array.from(recipientSources.keys());
-  const connectionPairs: Array<{ from: number; to: number }> = [];
+  const donorEdgeNums = Array.from(donorTargets.keys());
+  const recipientEdgeNums = Array.from(recipientSources.keys());
+  const connectionPairs: { from: number; to: number }[] = [];
   const pairSeen = new Set<string>();
   for (const [from, targets] of donorTargets.entries()) {
     for (const to of targets) {
@@ -732,26 +753,67 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
     }
   }
 
-  const edgeHighlightSelectors = new Set<string>();
-  edgeHighlightSelectors.add(".graph-grid .edge:hover");
-  donorIds.forEach((id) => edgeHighlightSelectors.add(`.graph-grid:has(.donor-node[data-can-id="${id}"]:hover) .edge[data-from="${id}"]`));
-  recipientIds.forEach((id) => edgeHighlightSelectors.add(`.graph-grid:has(.recipient-node[data-can-id="${id}"]:hover) .edge[data-to="${id}"]`));
+  const graphScope = ".graph-panel";
+  const shellScope = ".shell";
 
-  const nodeHighlightSelectors = new Set<string>();
-  // Self hover
-  nodeHighlightSelectors.add(".graph-grid .donor-node:hover");
-  nodeHighlightSelectors.add(".graph-grid .recipient-node:hover");
-  // Edge hover to nodes
-  donorIds.forEach((id) => nodeHighlightSelectors.add(`.graph-grid:has(.edge[data-from="${id}"]:hover) .donor-node[data-can-id="${id}"]`));
-  recipientIds.forEach((id) => nodeHighlightSelectors.add(`.graph-grid:has(.edge[data-to="${id}"]:hover) .recipient-node[data-can-id="${id}"]`));
-  // Node hover to opposite nodes via connections
+  const edgeHighlightSelectors = new Set<string>();
+  edgeHighlightSelectors.add(`${graphScope} .edge:hover`);
+  donorEdgeNums.forEach((id) => {
+    edgeHighlightSelectors.add(`${graphScope}:has(.donor-node[data-can-num="${id}"]:hover) .edge[data-from-num="${id}"]`);
+    edgeHighlightSelectors.add(`${shellScope}:has(.cell[data-can-num="${id}"]:hover) ${graphScope} .edge[data-from-num="${id}"]`);
+  });
+  recipientEdgeNums.forEach((id) => {
+    edgeHighlightSelectors.add(`${graphScope}:has(.recipient-node[data-can-num="${id}"]:hover) .edge[data-to-num="${id}"]`);
+    edgeHighlightSelectors.add(`${shellScope}:has(.cell[data-can-num="${id}"]:hover) ${graphScope} .edge[data-to-num="${id}"]`);
+  });
   connectionPairs.forEach(({ from, to }) => {
-    nodeHighlightSelectors.add(`.graph-grid:has(.donor-node[data-can-id="${from}"]:hover) .recipient-node[data-can-id="${to}"]`);
-    nodeHighlightSelectors.add(`.graph-grid:has(.recipient-node[data-can-id="${to}"]:hover) .donor-node[data-can-id="${from}"]`);
+    edgeHighlightSelectors.add(`${shellScope}:has(${graphScope} .edge[data-from-num="${from}"][data-to-num="${to}"]:hover) ${graphScope} .edge[data-from-num="${from}"]`);
+    edgeHighlightSelectors.add(`${shellScope}:has(${graphScope} .edge[data-from-num="${from}"][data-to-num="${to}"]:hover) ${graphScope} .edge[data-to-num="${to}"]`);
+  });
+
+  const canHighlightSelectors = new Set<string>();
+  // Self hover (nodes + cells)
+  canHighlightSelectors.add(`${graphScope} .donor-node:hover`);
+  canHighlightSelectors.add(`${graphScope} .recipient-node:hover`);
+  canHighlightSelectors.add(`${shellScope} .cell[data-can-num]:hover`);
+  // Edge hover to endpoints (nodes + cells)
+  connectionPairs.forEach(({ from, to }) => {
+    canHighlightSelectors.add(`${graphScope}:has(.edge[data-from-num="${from}"][data-to-num="${to}"]:hover) .donor-node[data-can-num="${from}"]`);
+    canHighlightSelectors.add(`${graphScope}:has(.edge[data-from-num="${from}"][data-to-num="${to}"]:hover) .recipient-node[data-can-num="${to}"]`);
+    canHighlightSelectors.add(`${shellScope}:has(${graphScope} .edge[data-from-num="${from}"][data-to-num="${to}"]:hover) .cell[data-can-num="${from}"]`);
+    canHighlightSelectors.add(`${shellScope}:has(${graphScope} .edge[data-from-num="${from}"][data-to-num="${to}"]:hover) .cell[data-can-num="${to}"]`);
+  });
+  // Node hover to own cell
+  donorNumsAll.forEach((id) => {
+    canHighlightSelectors.add(`${shellScope}:has(.graph-panel .donor-node[data-can-num="${id}"]:hover) .cell[data-can-num="${id}"]`);
+  });
+  recipientNumsAll.forEach((id) => {
+    canHighlightSelectors.add(`${shellScope}:has(.graph-panel .recipient-node[data-can-num="${id}"]:hover) .cell[data-can-num="${id}"]`);
+  });
+  // Cell hover to own node
+  donorNumsAll.forEach((id) => {
+    canHighlightSelectors.add(`${shellScope}:has(.cell[data-can-num="${id}"]:hover) ${graphScope} .donor-node[data-can-num="${id}"]`);
+  });
+  recipientNumsAll.forEach((id) => {
+    canHighlightSelectors.add(`${shellScope}:has(.cell[data-can-num="${id}"]:hover) ${graphScope} .recipient-node[data-can-num="${id}"]`);
+  });
+  // Node hover to opposite nodes and cells via connections
+  connectionPairs.forEach(({ from, to }) => {
+    canHighlightSelectors.add(`${graphScope}:has(.donor-node[data-can-num="${from}"]:hover) .recipient-node[data-can-num="${to}"]`);
+    canHighlightSelectors.add(`${shellScope}:has(.graph-panel .donor-node[data-can-num="${from}"]:hover) .cell[data-can-num="${to}"]`);
+    canHighlightSelectors.add(`${graphScope}:has(.recipient-node[data-can-num="${to}"]:hover) .donor-node[data-can-num="${from}"]`);
+    canHighlightSelectors.add(`${shellScope}:has(.graph-panel .recipient-node[data-can-num="${to}"]:hover) .cell[data-can-num="${from}"]`);
+  });
+  // Cell hover to opposite nodes and cells via connections
+  connectionPairs.forEach(({ from, to }) => {
+    canHighlightSelectors.add(`${shellScope}:has(.cell[data-can-num="${from}"]:hover) ${graphScope} .recipient-node[data-can-num="${to}"]`);
+    canHighlightSelectors.add(`${shellScope}:has(.cell[data-can-num="${from}"]:hover) .cell[data-can-num="${to}"]`);
+    canHighlightSelectors.add(`${shellScope}:has(.cell[data-can-num="${to}"]:hover) ${graphScope} .donor-node[data-can-num="${from}"]`);
+    canHighlightSelectors.add(`${shellScope}:has(.cell[data-can-num="${to}"]:hover) .cell[data-can-num="${from}"]`);
   });
 
   const edgeHighlightList = Array.from(edgeHighlightSelectors);
-  const nodeHighlightList = Array.from(nodeHighlightSelectors);
+  const canHighlightList = Array.from(canHighlightSelectors);
 
   const hoverCss = `
 ${edgeHighlightList.join(",\n")} {
@@ -760,7 +822,7 @@ ${edgeHighlightList.join(",\n")} {
   filter: drop-shadow(0 0 6px rgba(0, 51, 153, 0.25));
 }
 
-${nodeHighlightList.join(",\n")} {
+${canHighlightList.join(",\n")} {
   border-color: var(--color-focus);
   box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-focus) 35%, transparent), 0 6px 18px -12px rgba(0, 0, 0, 0.35);
 }
@@ -779,8 +841,9 @@ function renderSolution(cans: readonly Can[], plan: Plan): void {
     const can = cans[i];
     if (!can) {continue;}
     const finalFuel = getFinalFuel(plan, i);
+    const canNum = can.id;
     keepItems.push({
-      text: `Can #${i + 1} — ${can.spec.name} — ${finalFuel}g fuel`,
+      text: `Can #${canNum} — ${can.spec.name} — ${finalFuel}g fuel`,
     });
   }
   if (keepItems.length === 0) {
@@ -794,8 +857,13 @@ function renderSolution(cans: readonly Can[], plan: Plan): void {
       const amt = getTransferAmount(plan, i, j);
       if (amt > 0) {
         transferCount += 1;
+        const fromCan = cans[i];
+        const toCan = cans[j];
+        if (!fromCan || !toCan) {continue;}
+        const fromNum = fromCan.id;
+        const toNum = toCan.id;
         transferItems.push({
-          text: `Can #${i + 1} -> Can #${j + 1} — ${amt}g`,
+          text: `Can #${fromNum} -> Can #${toNum} — ${amt}g`,
         });
       }
     }

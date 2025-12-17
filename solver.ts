@@ -573,7 +573,9 @@ function assignIds(cans: Can[]): void {
   for (let i = 0; i < cans.length; i++) {
     const can = cans[i];
     if (!can) {continue;}
-    can.id = i;
+    if (!Number.isFinite(can.id) || can.id === 0 || can.id === -1) {
+      can.id = i + 1;
+    }
   }
 }
 
