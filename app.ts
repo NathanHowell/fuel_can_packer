@@ -781,10 +781,6 @@ function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipient
     edgeHighlightSelectors.add(`${graphScope}:has(.recipient-node[data-can-num="${id}"]:hover) .edge[data-to-num="${id}"]`);
     edgeHighlightSelectors.add(`${shellScope}:has(.cell[data-can-num="${id}"]:hover) ${graphScope} .edge[data-to-num="${id}"]`);
   });
-  connectionPairs.forEach(({ from, to }) => {
-    edgeHighlightSelectors.add(`${shellScope}:has(${graphScope} .edge[data-from-num="${from}"][data-to-num="${to}"]:hover) ${graphScope} .edge[data-from-num="${from}"]`);
-    edgeHighlightSelectors.add(`${shellScope}:has(${graphScope} .edge[data-from-num="${from}"][data-to-num="${to}"]:hover) ${graphScope} .edge[data-to-num="${to}"]`);
-  });
 
   const canHighlightSelectors = new Set<string>();
   // Self hover (nodes + cells)
