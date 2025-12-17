@@ -72,7 +72,9 @@ const donorColumnEl = document.getElementById("donor-column") as HTMLDivElement;
 const recipientColumnEl = document.getElementById("recipient-column") as HTMLDivElement;
 const graphGridEl = document.querySelector<HTMLDivElement>(".graph-grid");
 const graphSvgEl = document.getElementById("graph-svg") as unknown as SVGSVGElement;
-const outputEl = document.getElementById("output") as HTMLPreElement;
+const keepListEl = document.getElementById("keep-list") as HTMLUListElement | null;
+const transferListEl = document.getElementById("transfer-list") as HTMLUListElement | null;
+const totalsListEl = document.getElementById("totals-list") as HTMLUListElement | null;
 const inputErrorsEl = document.getElementById("input-errors") as HTMLDivElement | null;
 const overflowErrorEl = document.querySelector<HTMLDivElement>('[data-error="overflow"]');
 const underflowErrorEl = document.querySelector<HTMLDivElement>('[data-error="underflow"]');
@@ -107,6 +109,27 @@ function setStatus(state: StatusState, message: string): void {
 
   statusRowEl.setAttribute("data-state", state);
   statusTextEl.textContent = message;
+}
+
+interface ListItem {
+  readonly text: string;
+  readonly muted?: boolean;
+}
+
+function renderList(list: HTMLUListElement, items: readonly ListItem[]): void {
+  list.innerHTML = "";
+  for (const item of items) {
+    const li = document.createElement("li");
+    li.textContent = item.text;
+    if (item.muted) {li.classList.add("muted");}
+    list.appendChild(li);
+  }
+}
+
+function clearSolutionLists(): void {
+  for (const list of [keepListEl, transferListEl, totalsListEl]) {
+    if (list) {list.innerHTML = "";}
+  }
 }
 
 let inputNameCounter = 0;
@@ -301,7 +324,7 @@ function startWorkerSolve(requestId: number, cans: Can[]): void {
     if (data.ok) {
       const { plan, cans: canObjects } = data;
       renderGraph(canObjects, plan);
-      renderTextOutput(canObjects, plan);
+      renderSolution(canObjects, plan);
       resultsEl.setAttribute("data-visible", "true");
       resultsEl.removeAttribute("data-loading");
       setStatus("success", "Complete");
@@ -372,7 +395,7 @@ async function runCompute(): Promise<void> {
     donorColumnEl.innerHTML = "";
     recipientColumnEl.innerHTML = "";
     graphSvgEl.innerHTML = "";
-    outputEl.textContent = "";
+    clearSolutionLists();
     return;
   }
 
@@ -393,7 +416,7 @@ async function runCompute(): Promise<void> {
     donorColumnEl.innerHTML = "";
     recipientColumnEl.innerHTML = "";
     graphSvgEl.innerHTML = "";
-    outputEl.textContent = "";
+    clearSolutionLists();
     return;
   }
 
@@ -576,32 +599,38 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
   }
 }
 
-function renderTextOutput(cans: readonly Can[], plan: Plan): void {
-  let text = "SOLUTION\n\n";
+function renderSolution(cans: readonly Can[], plan: Plan): void {
+  if (!keepListEl || !transferListEl || !totalsListEl) {return;}
 
-  text += "Cans to keep:\n";
+  const keepItems: ListItem[] = [];
   for (let i = 0; i < cans.length; i++) {
-    if (plan.keep[i]) {
-      const can = cans[i];
-      if (!can) {continue;}
-      const finalFuel = getFinalFuel(plan, i);
-      text += `  • Can #${i + 1}: ${can.spec.name} with ${finalFuel}g fuel\n`;
-    }
+    if (!plan.keep[i]) {continue;}
+    const can = cans[i];
+    if (!can) {continue;}
+    const finalFuel = getFinalFuel(plan, i);
+    keepItems.push({
+      text: `Can #${i + 1} — ${can.spec.name} — ${finalFuel}g fuel`,
+    });
+  }
+  if (keepItems.length === 0) {
+    keepItems.push({ text: "No cans kept", muted: true });
   }
 
-  text += "\nTransfers:\n";
-  let hasTransfers = false;
+  const transferItems: ListItem[] = [];
+  let transferCount = 0;
   for (let i = 0; i < cans.length; i++) {
     for (let j = 0; j < cans.length; j++) {
       const amt = getTransferAmount(plan, i, j);
       if (amt > 0) {
-        hasTransfers = true;
-        text += `  • ${amt}g from Can #${i + 1} to Can #${j + 1}\n`;
+        transferCount += 1;
+        transferItems.push({
+          text: `Can #${i + 1} -> Can #${j + 1} — ${amt}g`,
+        });
       }
     }
   }
-  if (!hasTransfers) {
-    text += "  • No transfers needed\n";
+  if (transferItems.length === 0) {
+    transferItems.push({ text: "No transfers needed", muted: true });
   }
 
   const totalFuel = plan.final_fuel.reduce((a, b) => a + b, 0);
@@ -610,11 +639,18 @@ function renderTextOutput(cans: readonly Can[], plan: Plan): void {
       plan.keep[i] ? sum + can.spec.emptyWeight + getFinalFuel(plan, i) : sum,
     0
   );
+  const keptCount = plan.keep.reduce((a, keep) => a + (keep ? 1 : 0), 0);
 
-  text += `\nTotal fuel: ${totalFuel}g\n`;
-  text += `Total weight to carry: ${totalWeight}g\n`;
+  const totalsItems: ListItem[] = [
+    { text: `Total fuel: ${totalFuel}g` },
+    { text: `Total weight to carry: ${totalWeight}g` },
+    { text: `Cans carried: ${keptCount}` },
+    { text: `Transfer steps: ${transferCount}` },
+  ];
 
-  outputEl.textContent = text;
+  renderList(keepListEl, keepItems);
+  renderList(transferListEl, transferItems);
+  renderList(totalsListEl, totalsItems);
 }
 
 // Initialize on load

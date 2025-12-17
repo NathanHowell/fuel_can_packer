@@ -130,10 +130,6 @@
     @apply bg-slate-300 border-slate-700;
   }
 
-  .output {
-    @apply mt-2 bg-white border border-border rounded-lg p-3 min-h-[180px] whitespace-pre-wrap font-mono text-ink;
-  }
-
   .input-errors {
     @apply hidden grid gap-2;
   }
@@ -166,6 +162,27 @@
   .results[data-loading="true"] {
     @apply opacity-50 pointer-events-none transition-opacity duration-150 ease-in-out;
   }
+
+  .solution { @apply grid; }
+
+  .solution-grid {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+
+  .solution-card {
+    @apply border border-border rounded-lg p-3 bg-white grid gap-2;
+    align-content: start;
+  }
+
+  .solution-card h3 { @apply m-0 text-sm font-semibold; }
+
+  .solution-list {
+    @apply m-0 pl-5 grid gap-1 text-sm;
+    list-style: disc;
+  }
+
+  .solution-list li { @apply leading-snug; }
 
   .graph-panel {
     @apply relative border border-border rounded-lg p-4 bg-slate-50 min-h-[240px] overflow-hidden;
