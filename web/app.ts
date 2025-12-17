@@ -286,6 +286,14 @@ function terminatePendingWorker(): void {
 }
 
 function startWorkerSolve(requestId: number, cans: Can[]): void {
+  console.log("Creating worker:", {
+    requestId,
+    cansCount: cans.length,
+    workerUrl: new URL("./solver-worker.js", import.meta.url).href,
+    userAgent: navigator.userAgent,
+    isFirefoxIOS: /FxiOS/i.test(navigator.userAgent)
+  });
+  
   const worker = new Worker(new URL("./solver-worker.js", import.meta.url), { type: "module" });
   pendingWorker = worker;
 
@@ -313,13 +321,78 @@ function startWorkerSolve(requestId: number, cans: Can[]): void {
 
   const handleError = (event: ErrorEvent | MessageEvent<unknown>): void => {
     const isCurrent = requestId === currentRequestId;
-    const message = event instanceof ErrorEvent ? event.message : "Worker error";
+    
+    // Enhanced debugging for Firefox on iOS
+    let message: string;
+    const debugInfo: string[] = [];
+    
+    if (event instanceof ErrorEvent) {
+      message = event.message;
+      debugInfo.push(`ErrorEvent: ${event.message}`);
+      if (event.filename !== "") {
+        debugInfo.push(`File: ${event.filename}`);
+      }
+      if (event.lineno !== 0) {
+        debugInfo.push(`Line: ${event.lineno}`);
+      }
+      if (event.colno !== 0) {
+        debugInfo.push(`Column: ${event.colno}`);
+      }
+      if (event.error !== null && event.error !== undefined) {
+        debugInfo.push(`Error object: ${String(event.error)}`);
+      }
+    } else {
+      // MessageEvent - log complete details
+      debugInfo.push(`MessageEvent type: ${event.type}`);
+      debugInfo.push(`Event constructor: ${event.constructor.name}`);
+      debugInfo.push(`Event data: ${JSON.stringify(event.data)}`);
+      
+      // Extract error information from the event
+      if (event.data !== null && event.data !== undefined && typeof event.data === 'object') {
+        const data = event.data as Record<string, unknown>;
+        if ('error' in data) {
+          message = `Worker message error: ${String(data['error'])}`;
+        } else if ('message' in data) {
+          message = `Worker message: ${String(data['message'])}`;
+        } else {
+          message = `Worker error (MessageEvent): ${JSON.stringify(event.data)}`;
+        }
+      } else {
+        message = "Worker error (unknown MessageEvent data)";
+      }
+    }
+    
+    // Detect Firefox on iOS for additional context
+    const isFirefoxIOS = /FxiOS/i.test(navigator.userAgent);
+    if (isFirefoxIOS) {
+      debugInfo.push("Browser: Firefox on iOS");
+    }
+    debugInfo.push(`User Agent: ${navigator.userAgent}`);
+    
+    // Log all debug information to console
+    console.error("Worker error details:", {
+      isCurrent,
+      requestId,
+      currentRequestId,
+      message,
+      event,
+      debugInfo,
+      eventType: event.type,
+      eventConstructor: event.constructor.name,
+      isFirefoxIOS
+    });
+    
     cleanup();
     if (!isCurrent) {
       return;
     }
     resultsEl.removeAttribute("data-loading");
-    setStatus("error", `Error: ${message}`);
+    
+    // Include debug info in the error message for visibility
+    const fullMessage = isFirefoxIOS 
+      ? `${message} (Firefox iOS - check console for details)`
+      : message;
+    setStatus("error", `Error: ${fullMessage}`);
   };
 
   const cleanup = (): void => {
