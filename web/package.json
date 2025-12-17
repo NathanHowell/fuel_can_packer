@@ -12,7 +12,7 @@
     "build": "npm run lint && npm run typecheck && npm run bundle",
     "build:deploy": "npm run build && tsx ./assemble-site.mts",
     "start": "tsx ./serve.mts",
-    "test": "tsx ./test-solver.mts"
+    "test": "node --test --import tsx solver.test.ts"
   },
   "keywords": [
     "msr",

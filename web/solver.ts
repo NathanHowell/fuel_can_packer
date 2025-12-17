@@ -54,6 +54,28 @@ interface BestSolution {
   plan: Plan;
 }
 
+interface GroupedCans {
+  spec: CanSpec;
+  indices: readonly number[];
+}
+
+interface SolverInputs {
+  n: number;
+  caps: readonly number[];
+  empties: readonly number[];
+  init: readonly number[];
+  totalFuel: number;
+}
+
+interface PlanValidationInput {
+  keep: readonly boolean[];
+  finalFuel: readonly number[];
+  transfers: readonly (readonly number[])[];
+  caps: readonly number[];
+  init: readonly number[];
+  totalFuel: number;
+}
+
 export const SPECS: readonly CanSpec[] = [
   { key: "msr110", name: "MSR 110g", capacity: 110, emptyWeight: 101 },
   { key: "msr227", name: "MSR 227g", capacity: 227, emptyWeight: 147 },
@@ -295,24 +317,21 @@ function allocateMinEdgesAndMinTransfer(
   return greedy;
 }
 
-async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
-  if (!cans.length) {throw new Error("No cans provided");}
+function emptyPlan(n: number): Plan {
+  return { keep: Array(n).fill(false), final_fuel: Array(n).fill(0), transfers: zeros2(n) };
+}
 
-  const n = cans.length;
+function prepareInputs(cans: readonly Can[]): SolverInputs {
+  if (!cans.length) {throw new Error("No cans provided");}
   const caps = cans.map((c) => c.spec.capacity);
   const empties = cans.map((c) => c.spec.emptyWeight);
   const init = cans.map((c) => c.fuel);
   const totalFuel = init.reduce((a, b) => a + b, 0);
+  return { n: cans.length, caps, empties, init, totalFuel };
+}
 
-  if (totalFuel === 0) {
-    return {
-      keep: Array(n).fill(false),
-      final_fuel: Array(n).fill(0),
-      transfers: zeros2(n),
-    };
-  }
-
-  const grouped = SPECS.map((spec) => ({
+function groupCansBySpec(cans: readonly Can[]): GroupedCans[] {
+  return SPECS.map((spec) => ({
     spec,
     indices: cans
       .map((c, idx) => ({ c, idx }))
@@ -320,109 +339,190 @@ async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
       .sort((a, b) => b.c.fuel - a.c.fuel)
       .map(({ idx }) => idx),
   }));
+}
 
+function estimateWorkload(grouped: readonly GroupedCans[], n: number): number {
+  const lenA = grouped[0]?.indices.length ?? 0;
+  const lenB = grouped[1]?.indices.length ?? 0;
+  return (lenA + 1) * (lenB + 1) * n;
+}
+
+function neededGroupC(totalFuel: number, capAB: number, groupC: GroupedCans | undefined): number {
+  const remaining = totalFuel - capAB;
+  if (remaining <= 0) {return 0;}
+  const capC = groupC?.spec.capacity ?? Infinity;
+  return Math.ceil(remaining / capC);
+}
+
+function emptyCostForCounts(emptyAB: number, groupC: GroupedCans | undefined, neededC: number): number {
+  return emptyAB + (groupC?.spec.emptyWeight ?? 0) * neededC;
+}
+
+function buildKeepMask(
+  grouped: readonly GroupedCans[],
+  keepA: number,
+  keepB: number,
+  keepC: number,
+  n: number
+): boolean[] {
+  const keep: boolean[] = Array<boolean>(n).fill(false);
+  const groupA = grouped[0];
+  const groupB = grouped[1];
+  const groupC = grouped[2];
+  if (groupA) {
+    for (const idx of groupA.indices.slice(0, keepA)) {keep[idx] = true;}
+  }
+  if (groupB) {
+    for (const idx of groupB.indices.slice(0, keepB)) {keep[idx] = true;}
+  }
+  if (groupC) {
+    for (const idx of groupC.indices.slice(0, keepC)) {keep[idx] = true;}
+  }
+  return keep;
+}
+
+function capacityAndWeight(
+  keep: readonly boolean[],
+  caps: readonly number[],
+  empties: readonly number[]
+): { capSum: number; emptyCost: number } {
+  let capSum = 0;
+  let emptyCost = 0;
+  for (let i = 0; i < keep.length; i++) {
+    if (!keep[i]) {continue;}
+    const capVal = caps[i];
+    const emptyVal = empties[i];
+    if (capVal === undefined || emptyVal === undefined) {
+      throw new Error("internal: missing can data");
+    }
+    capSum += capVal;
+    emptyCost += emptyVal;
+  }
+  return { capSum, emptyCost };
+}
+
+function buildBaselineAndSlack(
+  keep: readonly boolean[],
+  init: readonly number[],
+  caps: readonly number[]
+): { baseline: number[]; slack: Recipient[] } {
+  const baseline: number[] = Array<number>(keep.length).fill(0);
+  const slack: Recipient[] = [];
+  for (let i = 0; i < keep.length; i++) {
+    if (!keep[i]) {continue;}
+    const initVal = init[i];
+    const capVal = caps[i];
+    if (initVal === undefined || capVal === undefined) {
+      throw new Error("internal: missing can data");
+    }
+    const base = Math.min(initVal, capVal);
+    baseline[i] = base;
+    const s = capVal - base;
+    if (s > 0) {slack.push({ to: i, cap: s });}
+  }
+  return { baseline, slack };
+}
+
+function collectDonors(
+  keep: readonly boolean[],
+  init: readonly number[],
+  caps: readonly number[]
+): Donor[] {
+  const donors: Donor[] = [];
+  for (let i = 0; i < keep.length; i++) {
+    const initVal = init[i];
+    const capVal = caps[i];
+    if (initVal === undefined || capVal === undefined) {
+      throw new Error("internal: missing can data");
+    }
+    if (!keep[i]) {
+      if (initVal > 0) {donors.push({ from: i, amt: initVal });}
+    } else {
+      const excess = Math.max(0, initVal - capVal);
+      if (excess > 0) {donors.push({ from: i, amt: excess });}
+    }
+  }
+  return donors;
+}
+
+function buildTransfersMatrix(n: number, edges: readonly Edge[]): number[][] {
+  const transfers: number[][] = zeros2(n);
+  for (const e of edges) {
+    const row = transfers[e.from];
+    if (!row) {throw new Error("internal: missing transfer row");}
+    const current = row[e.to];
+    if (current === undefined) {throw new Error("internal: missing transfer entry");}
+    row[e.to] = current + e.amt;
+  }
+  return transfers;
+}
+
+function buildFinalFuel(
+  keep: readonly boolean[],
+  baseline: readonly number[],
+  edges: readonly Edge[],
+  n: number
+): number[] {
+  const finalFuel: number[] = Array<number>(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    const base = baseline[i];
+    if (base === undefined) {throw new Error("internal: missing baseline");}
+    finalFuel[i] = keep[i] ? base : 0;
+  }
+  for (const e of edges) {
+    const current = finalFuel[e.to];
+    if (current === undefined) {throw new Error("internal: invalid recipient index");}
+    finalFuel[e.to] = current + e.amt;
+  }
+  return finalFuel;
+}
+
+function validatePlanState(input: PlanValidationInput): void {
+  const { keep, finalFuel, transfers, caps, init, totalFuel } = input;
+  for (let i = 0; i < keep.length; i++) {
+    const finalFuelVal = finalFuel[i];
+    const capVal = caps[i];
+    const initVal = init[i];
+    if (finalFuelVal === undefined || capVal === undefined || initVal === undefined) {
+      throw new Error("internal: missing can data");
+    }
+    if (!keep[i] && finalFuelVal !== 0) {
+      throw new Error("internal: non-kept can ended with fuel");
+    }
+    if (keep[i] && (finalFuelVal < 0 || finalFuelVal > capVal)) {
+      throw new Error("internal: capacity violation");
+    }
+    const row = transfers[i];
+    if (!row) {throw new Error("internal: missing transfer row");}
+    const out = row.reduce((a, b) => a + b, 0);
+    if (out > initVal) {throw new Error("internal: outflow > initial fuel");}
+  }
+  const sumFinal = finalFuel.reduce((a, b) => a + b, 0);
+  if (sumFinal !== totalFuel) {throw new Error("internal: fuel not conserved");}
+}
+
+function buildPlanForKeep(keep: readonly boolean[], inputs: SolverInputs): BestSolution | null {
+  const { caps, empties, init, totalFuel, n } = inputs;
+  const { capSum, emptyCost } = capacityAndWeight(keep, caps, empties);
+  if (capSum < totalFuel) {return null;}
+
+  const { baseline, slack } = buildBaselineAndSlack(keep, init, caps);
+  const donors = collectDonors(keep, init, caps);
+  const alloc = allocateMinEdgesAndMinTransfer(donors, slack);
+  if (!alloc) {return null;}
+
+  const transfers = buildTransfersMatrix(n, alloc.edges);
+  const finalFuel = buildFinalFuel(keep, baseline, alloc.edges, n);
+  validatePlanState({ keep, finalFuel, transfers, caps, init, totalFuel });
+
+  const score: Score = [emptyCost, alloc.pairCount, alloc.transferTotal];
+  return { score, plan: { keep, final_fuel: finalFuel, transfers } };
+}
+
+function findBestPlan(inputs: SolverInputs, grouped: readonly GroupedCans[]): BestSolution | null {
   const lenA = grouped[0]?.indices.length ?? 0;
   const lenB = grouped[1]?.indices.length ?? 0;
   const lenC = grouped[2]?.indices.length ?? 0;
-
-  const workEstimate = (lenA + 1) * (lenB + 1) * n;
-  if (workEstimate > 5_000_000) {
-    throw new Error("Too many cans for the browser solver (try reducing to ~300 cans)");
-  }
-
-  const buildPlanForKeep = (keep: readonly boolean[]): BestSolution | null => {
-    let capSum = 0;
-    let emptyCost = 0;
-    for (let i = 0; i < n; i++) {
-      if (!keep[i]) {continue;}
-      const capVal = caps[i];
-      const emptyVal = empties[i];
-      if (capVal === undefined || emptyVal === undefined) {
-        throw new Error("internal: missing can data");
-      }
-      capSum += capVal;
-      emptyCost += emptyVal;
-    }
-    if (capSum < totalFuel) {return null;}
-
-    const baseline: number[] = Array<number>(n).fill(0);
-    const slack: Recipient[] = [];
-    for (let i = 0; i < n; i++) {
-      if (!keep[i]) {continue;}
-      const initVal = init[i];
-      const capVal = caps[i];
-      if (initVal === undefined || capVal === undefined) {
-        throw new Error("internal: missing can data");
-      }
-      const base = Math.min(initVal, capVal);
-      baseline[i] = base;
-      const s = capVal - base;
-      if (s > 0) {slack.push({ to: i, cap: s });}
-    }
-
-    const donors: Donor[] = [];
-    for (let i = 0; i < n; i++) {
-      const initVal = init[i];
-      const capVal = caps[i];
-      if (initVal === undefined || capVal === undefined) {
-        throw new Error("internal: missing can data");
-      }
-      if (!keep[i]) {
-        if (initVal > 0) {donors.push({ from: i, amt: initVal });}
-      } else {
-        const excess = Math.max(0, initVal - capVal);
-        if (excess > 0) {donors.push({ from: i, amt: excess });}
-      }
-    }
-
-    const alloc = allocateMinEdgesAndMinTransfer(donors, slack);
-    if (!alloc) {return null;}
-
-    const transfers: number[][] = zeros2(n);
-    for (const e of alloc.edges) {
-      const row = transfers[e.from];
-      if (!row) {throw new Error("internal: missing transfer row");}
-      const current = row[e.to];
-      if (current === undefined) {throw new Error("internal: missing transfer entry");}
-      row[e.to] = current + e.amt;
-    }
-
-    const finalFuel: number[] = Array<number>(n).fill(0);
-    for (let i = 0; i < n; i++) {
-      const base = baseline[i];
-      if (base === undefined) {throw new Error("internal: missing baseline");}
-      finalFuel[i] = keep[i] ? base : 0;
-    }
-    for (const e of alloc.edges) {
-      const current = finalFuel[e.to];
-      if (current === undefined) {throw new Error("internal: invalid recipient index");}
-      finalFuel[e.to] = current + e.amt;
-    }
-
-    for (let i = 0; i < n; i++) {
-      const finalFuelVal = finalFuel[i];
-      const capVal = caps[i];
-      const initVal = init[i];
-      if (finalFuelVal === undefined || capVal === undefined || initVal === undefined) {
-        throw new Error("internal: missing can data");
-      }
-      if (!keep[i] && finalFuelVal !== 0) {
-        throw new Error("internal: non-kept can ended with fuel");
-      }
-      if (keep[i] && (finalFuelVal < 0 || finalFuelVal > capVal)) {
-        throw new Error("internal: capacity violation");
-      }
-      const row = transfers[i];
-      if (!row) {throw new Error("internal: missing transfer row");}
-      const out = row.reduce((a, b) => a + b, 0);
-      if (out > initVal) {throw new Error("internal: outflow > initial fuel");}
-    }
-    const sumFinal = finalFuel.reduce((a, b) => a + b, 0);
-    if (sumFinal !== totalFuel) {throw new Error("internal: fuel not conserved");}
-
-    const score: Score = [emptyCost, alloc.pairCount, alloc.transferTotal];
-    return { score, plan: { keep, final_fuel: finalFuel, transfers } };
-  };
 
   let best: BestSolution | null = null;
   const groupA = grouped[0];
@@ -436,34 +536,35 @@ async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
       const capAB = capA + (groupB?.spec.capacity ?? 0) * keepB;
       const emptyAB = emptyA + (groupB?.spec.emptyWeight ?? 0) * keepB;
 
-      const remaining = totalFuel - capAB;
-      const neededC = remaining <= 0 ? 0 : Math.ceil(remaining / (groupC?.spec.capacity ?? Infinity));
+      const neededC = neededGroupC(inputs.totalFuel, capAB, groupC);
       if (neededC > lenC) {continue;}
 
-      const emptyTotal = emptyAB + (groupC?.spec.emptyWeight ?? 0) * neededC;
-
-      if (best && emptyTotal > best.score[0] && capAB >= totalFuel) {break;}
+      const emptyTotal = emptyCostForCounts(emptyAB, groupC, neededC);
+      if (best && emptyTotal > best.score[0] && capAB >= inputs.totalFuel) {break;}
       if (best && emptyTotal > best.score[0]) {continue;}
 
-      const keep: boolean[] = Array<boolean>(n).fill(false);
-      if (groupA) {
-        for (const idx of groupA.indices.slice(0, keepA)) {keep[idx] = true;}
-      }
-      if (groupB) {
-        for (const idx of groupB.indices.slice(0, keepB)) {keep[idx] = true;}
-      }
-      if (groupC) {
-        for (const idx of groupC.indices.slice(0, neededC)) {keep[idx] = true;}
-      }
-
-      const candidate = buildPlanForKeep(keep);
+      const keepMask = buildKeepMask(grouped, keepA, keepB, neededC, inputs.n);
+      const candidate = buildPlanForKeep(keepMask, inputs);
       if (!candidate) {continue;}
       if (!best || lexLess(candidate.score, best.score)) {
         best = candidate;
       }
     }
   }
+  return best;
+}
 
+async function solveWithJS(cans: readonly Can[]): Promise<Plan> {
+  const inputs = prepareInputs(cans);
+  if (inputs.totalFuel === 0) {return emptyPlan(inputs.n);}
+
+  const grouped = groupCansBySpec(cans);
+  const workEstimate = estimateWorkload(grouped, inputs.n);
+  if (workEstimate > 5_000_000) {
+    throw new Error("Too many cans for the browser solver (try reducing to ~300 cans)");
+  }
+
+  const best = findBestPlan(inputs, grouped);
   if (!best) {throw new Error("No feasible plan found");}
   return best.plan;
 }
