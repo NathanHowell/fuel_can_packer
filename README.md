@@ -1,6 +1,6 @@
 # Fuel Can Packer
 
-Static web app that computes optimal transfers between MSR 110g, 227g, and 450g fuel canisters to minimize the empty weight you carry. Everything runs client-side using Z3.wasm via the `z3-solver` npm package.
+Static web app that computes optimal transfers between MSR 110g, 227g, and 450g fuel canisters to minimize the empty weight you carry. Everything runs client-side using a custom WebAssembly solver.
 
 ## Development
 - Install dependencies: `npm install`
