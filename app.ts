@@ -68,6 +68,7 @@ const columnsEl = document.getElementById("columns") as HTMLDivElement;
 const columnTemplateEl = document.getElementById("column-template") as HTMLTemplateElement | null;
 const cellTemplateEl = document.getElementById("cell-template") as HTMLTemplateElement | null;
 const resultsEl = document.getElementById("results") as HTMLDivElement;
+const graphPanelEl = document.querySelector<HTMLDivElement>(".graph-panel");
 const donorColumnEl = document.getElementById("donor-column") as HTMLDivElement;
 const recipientColumnEl = document.getElementById("recipient-column") as HTMLDivElement;
 const graphGridEl = document.querySelector<HTMLDivElement>(".graph-grid");
@@ -513,11 +514,11 @@ function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipient
   if (!graphGridEl) {return;}
 
   const gridRect = graphGridEl.getBoundingClientRect();
-  const width = Math.max(1, Math.floor(gridRect.width));
+  const panelRect = graphPanelEl?.getBoundingClientRect();
   const height = Math.max(1, Math.floor(gridRect.height));
-  graphSvgEl.setAttribute("width", String(width));
-  graphSvgEl.setAttribute("height", String(height));
-  graphSvgEl.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  // Track the horizontal extent of all edges so we can keep the SVG as narrow as possible.
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
   const recipientSums = new Map<number, number>();
   const donorTargets = new Map<number, Set<number>>();
   const recipientSources = new Map<number, Set<number>>();
@@ -563,6 +564,8 @@ function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipient
       const y1 = fromRect.top + fromRect.height / 2 - gridRect.top;
       const x2 = toRect.left - gridRect.left;
       const y2 = toRect.top + toRect.height / 2 - gridRect.top;
+      minX = Math.min(minX, x1, x2);
+      maxX = Math.max(maxX, x1, x2);
 
       let targetSet = donorTargets.get(fromNum);
       if (!targetSet) {
@@ -616,6 +619,25 @@ function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipient
   if (edgesToRender.length === 0) {
     return;
   }
+
+  // Fit the SVG horizontally to just the space the edges occupy.
+  const horizontalPadding = 16;
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
+    minX = 0;
+    maxX = 1;
+  }
+  const paddedMinX = minX - horizontalPadding;
+  const paddedMaxX = maxX + horizontalPadding;
+  const width = Math.max(1, Math.ceil(paddedMaxX - paddedMinX));
+  graphSvgEl.setAttribute("width", String(width));
+  graphSvgEl.setAttribute("height", String(height));
+  graphSvgEl.setAttribute("viewBox", `${paddedMinX} 0 ${width} ${height}`);
+  const panelLeft = panelRect?.left ?? gridRect.left;
+  graphSvgEl.style.left = `${paddedMinX + gridRect.left - panelLeft}px`;
+  graphSvgEl.style.right = "auto";
+  graphSvgEl.style.width = `${width}px`;
+  graphSvgEl.style.top = "0";
+  graphSvgEl.style.bottom = "0";
 
   // Scale stroke/opacity to grams transferred so thicker flows represent more fuel.
   const maxAmt = edgesToRender.reduce((max, edge) => Math.max(max, edge.amt), 0);
