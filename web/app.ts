@@ -109,6 +109,15 @@ function setStatus(state: StatusState, message: string): void {
   statusTextEl.textContent = message;
 }
 
+const waitForFontsReady = (() => {
+  let readyPromise: Promise<void> | null = null;
+  return (): Promise<void> => {
+    if (readyPromise) {return readyPromise;}
+    readyPromise = document.fonts.ready.then(() => undefined);
+    return readyPromise;
+  };
+})();
+
 let inputNameCounter = 0;
 
 function nextInputName(specKey: string): string {
@@ -469,7 +478,9 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
   }
 
   // Draw transfer edges
-  setTimeout(() => drawEdges(cans, plan, donors, recipients), 0);
+  void waitForFontsReady().then(() => {
+    window.requestAnimationFrame(() => drawEdges(cans, plan, donors, recipients));
+  });
 }
 
 function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipients: number[]): void {
