@@ -48,7 +48,9 @@ workerScope.addEventListener("message", async (event: MessageEvent<WorkerRequest
   console.log("Worker received message:", {
     requestId,
     cansCount: cans.length,
-    cans: cans.map(c => ({ spec: c.spec.key, fuel: c.fuel, gross: c.gross })),
+    // Log first few cans only to avoid performance issues with large datasets
+    cans: cans.slice(0, 5).map(c => ({ spec: c.spec.key, fuel: c.fuel, gross: c.gross })),
+    hasMoreCans: cans.length > 5,
   });
   
   try {
@@ -61,12 +63,22 @@ workerScope.addEventListener("message", async (event: MessageEvent<WorkerRequest
     const errorMessage = err instanceof Error ? err.message : String(err);
     const errorStack = err instanceof Error ? err.stack : undefined;
     
+    // Get error type safely
+    let errorType: string;
+    try {
+      errorType = (err !== null && typeof err === 'object' && 'constructor' in err) 
+        ? err.constructor.name 
+        : typeof err;
+    } catch {
+      errorType = typeof err;
+    }
+    
     console.error("Worker error during computation:", {
       requestId,
       error: err,
       errorMessage,
       errorStack,
-      errorType: (err !== null && typeof err === 'object') ? err.constructor.name : typeof err,
+      errorType,
       errorString: String(err),
     });
     
