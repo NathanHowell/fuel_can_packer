@@ -222,13 +222,48 @@
     pointer-events: none;
   }
 
+  .node:hover,
+  .node[data-hovered="true"] {
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-focus) 35%, transparent), 0 6px 18px -12px rgba(0, 0, 0, 0.35);
+  }
+
+  .node:hover::after,
+  .node[data-hovered="true"]::after {
+    opacity: 0.38;
+  }
+
+  .node:hover strong,
+  .node[data-hovered="true"] strong {
+    color: var(--color-focus);
+  }
+
   .node strong { @apply text-sm; }
   .node .muted { @apply text-muted text-xs; }
 
-  .graph-panel svg { @apply absolute inset-0 pointer-events-none; }
-  .edge { @apply stroke-accent/70 stroke-2 fill-none; }
+  .graph-panel svg { @apply absolute inset-0; }
+  .edge {
+    @apply stroke-accent fill-none;
+    stroke-width: var(--edge-width, 2px);
+    stroke-opacity: var(--edge-opacity, 0.5);
+    stroke-linecap: butt;
+    stroke-linejoin: round;
+    mix-blend-mode: multiply;
+    pointer-events: visibleStroke;
+    transition: stroke 150ms ease, stroke-opacity 150ms ease, filter 150ms ease;
+  }
+
+  .edge:hover,
+  .edge[data-hovered="true"] {
+    stroke: var(--color-focus);
+    stroke-opacity: 0.95;
+    filter: drop-shadow(0 0 6px rgba(0, 51, 153, 0.25));
+  }
+
+
   .edge-label {
     @apply fill-muted text-[12px] font-sans;
+    pointer-events: none;
     filter:
       drop-shadow(0 1px 2px rgba(255, 255, 255, 0.9))
       drop-shadow(0 -1px 2px rgba(255, 255, 255, 0.9))

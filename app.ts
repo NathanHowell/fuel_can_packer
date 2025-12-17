@@ -515,6 +515,7 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
     x2: number;
     y2: number;
     labelOffset: number;
+    strokeWidth: number;
   }
   const edgesToRender: EdgeRender[] = [];
 
@@ -535,7 +536,17 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
       const x2 = toRect.left - gridRect.left;
       const y2 = toRect.top + toRect.height / 2 - gridRect.top;
 
-      edgesToRender.push({ fromIdx: i, toIdx: j, amt, x1, y1, x2, y2, labelOffset: 0 });
+      edgesToRender.push({
+        fromIdx: i,
+        toIdx: j,
+        amt,
+        x1,
+        y1,
+        x2,
+        y2,
+        labelOffset: 0,
+        strokeWidth: 0,
+      });
     }
   }
 
@@ -558,6 +569,64 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
     });
   }
 
+  if (edgesToRender.length === 0) {
+    return;
+  }
+
+  // Scale stroke/opacity to grams transferred so thicker flows represent more fuel.
+  const maxAmt = edgesToRender.reduce((max, edge) => Math.max(max, edge.amt), 0);
+  const minStroke = 1.5;
+  const maxStroke = 12;
+  const strokeForAmt = (amt: number): number => {
+    if (maxAmt <= 0) {return minStroke;}
+    const t = Math.sqrt(amt / maxAmt);
+    return minStroke + (maxStroke - minStroke) * t;
+  };
+
+  // Draw thicker flows first so thinner ones sit on top.
+  edgesToRender.sort((a, b) => b.amt - a.amt);
+
+  const packEdgeGroup = (
+    list: EdgeRender[],
+    anchorY: number,
+    sortKey: (edge: EdgeRender) => number,
+    assign: (edge: EdgeRender, y: number) => void
+  ): void => {
+    if (list.length === 0) {return;}
+    list.sort((a, b) => sortKey(a) - sortKey(b));
+    const totalWidth = list.reduce((sum, edge) => sum + edge.strokeWidth, 0);
+    let cursor = anchorY - totalWidth / 2;
+    for (const edge of list) {
+      cursor += edge.strokeWidth / 2;
+      assign(edge, cursor);
+      cursor += edge.strokeWidth / 2;
+    }
+  };
+
+  // Compute stroke styles and pack recipient Y positions so strokes touch at the destination.
+  const edgesByTo = new Map<number, EdgeRender[]>();
+  for (const edge of edgesToRender) {
+    edge.strokeWidth = strokeForAmt(edge.amt);
+    const list = edgesByTo.get(edge.toIdx);
+    if (list) {
+      list.push(edge);
+    } else {
+      edgesByTo.set(edge.toIdx, [edge]);
+    }
+  }
+
+  // Pack donors (start Y) so strokes touch at the source.
+  for (const list of edgesByFrom.values()) {
+    const anchorY = list[0]?.y1 ?? 0;
+    packEdgeGroup(list, anchorY, (edge) => edge.y2, (edge, y) => { edge.y1 = y; });
+  }
+
+  // Pack recipients (end Y) so strokes touch at the destination.
+  for (const list of edgesByTo.values()) {
+    const anchorY = list[0]?.y2 ?? 0;
+    packEdgeGroup(list, anchorY, (edge) => edge.y1, (edge, y) => { edge.y2 = y; });
+  }
+
   function addLabel(x: number, y: number, anchor: "start" | "middle" | "end", textValue: string): void {
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -572,12 +641,18 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
   }
 
   for (const edge of edgesToRender) {
-    const { toIdx, amt, x1, y1, x2, y2, labelOffset } = edge;
+    const { toIdx, amt, x1, y1, x2, y2, labelOffset, strokeWidth } = edge;
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     const midX = (x1 + x2) / 2;
-    path.setAttribute("d", `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
+    // Nudge the start point slightly into the donor box so square caps meet the edge without gaps or overshoot.
+    const startX = x1 - 1;
+    path.setAttribute("d", `M ${startX} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`);
     path.setAttribute("fill", "none");
     path.setAttribute("class", "edge");
+    path.dataset["from"] = String(edge.fromIdx);
+    path.dataset["to"] = String(edge.toIdx);
+    path.style.setProperty("--edge-width", `${strokeWidth}px`);
+    path.style.setProperty("--edge-opacity", "0.5");
     graphSvgEl.appendChild(path);
 
     const labelX = x1 + 12; // keep label aligned with donor
@@ -597,6 +672,59 @@ function drawEdges(cans: readonly Can[], plan: Plan, _donors: number[], _recipie
 
     addLabel(x, y, "end", `${total}g`);
   }
+
+  // Hover interactions: highlight connected edges and nodes.
+  const allEdges = Array.from(graphSvgEl.querySelectorAll<SVGPathElement>(".edge"));
+  const allDonorNodes = Array.from(donorColumnEl.querySelectorAll<HTMLElement>(".node"));
+  const allRecipientNodes = Array.from(recipientColumnEl.querySelectorAll<HTMLElement>(".node"));
+
+  const clearHover = (): void => {
+    for (const el of [...allEdges, ...allDonorNodes, ...allRecipientNodes]) {
+      el.removeAttribute("data-hovered");
+    }
+  };
+
+  const highlightConnection = (fromIdx?: number, toIdx?: number): void => {
+    clearHover();
+    for (const edge of allEdges) {
+      const edgeFrom = Number(edge.dataset["from"]);
+      const edgeTo = Number(edge.dataset["to"]);
+      const fromMatch = fromIdx === undefined || edgeFrom === fromIdx;
+      const toMatch = toIdx === undefined || edgeTo === toIdx;
+      if (fromMatch && toMatch) {
+        edge.setAttribute("data-hovered", "true");
+        if (!Number.isNaN(edgeFrom)) {
+          donorColumnEl.querySelector<HTMLElement>(`.node[data-can-id="${edgeFrom}"]`)?.setAttribute("data-hovered", "true");
+        }
+        if (!Number.isNaN(edgeTo)) {
+          recipientColumnEl.querySelector<HTMLElement>(`.node[data-can-id="${edgeTo}"]`)?.setAttribute("data-hovered", "true");
+        }
+      }
+    }
+  };
+
+  const bindNodeHover = (node: HTMLElement, role: "donor" | "recipient"): void => {
+    const idx = Number(node.dataset["canId"]);
+    node.addEventListener("mouseenter", () => {
+      if (role === "donor") {
+        highlightConnection(idx, undefined);
+      } else {
+        highlightConnection(undefined, idx);
+      }
+    });
+    node.addEventListener("mouseleave", clearHover);
+  };
+
+  allDonorNodes.forEach((node) => bindNodeHover(node, "donor"));
+  allRecipientNodes.forEach((node) => bindNodeHover(node, "recipient"));
+  allEdges.forEach((edge) => {
+    edge.addEventListener("mouseenter", () => {
+      const fromIdx = Number(edge.dataset["from"]);
+      const toIdx = Number(edge.dataset["to"]);
+      highlightConnection(Number.isNaN(fromIdx) ? undefined : fromIdx, Number.isNaN(toIdx) ? undefined : toIdx);
+    });
+    edge.addEventListener("mouseleave", clearHover);
+  });
 }
 
 function renderSolution(cans: readonly Can[], plan: Plan): void {
