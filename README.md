@@ -1,6 +1,6 @@
 # Fuel Can Packer
 
-Static web app that computes optimal transfers between MSR 110g, 227g, and 450g fuel canisters to minimize the empty weight you carry. Everything runs client-side using a custom TypeScript solver in a Web Worker.
+Static web app that computes optimal transfers between mixed isobutane fuel canisters to minimize the empty weight you carry. Choose your can types (defaults include MSR 110g/227g/450g) and everything runs client-side using a custom TypeScript solver in a Web Worker.
 
 See [ALGORITHM.md](ALGORITHM.md) for detailed documentation on the optimization algorithm, complexity analysis, and performance characteristics.
 

@@ -119,6 +119,12 @@ export const SPECS: readonly CanSpec[] = [
   { key: "msr450", name: "MSR 450g", capacity: 450, emptyWeight: 216 },
 ] as const;
 
+export function buildSpecMap(specs: readonly CanSpec[]): ReadonlyMap<string, CanSpec> {
+  return new Map(specs.map((spec) => [spec.key, spec]));
+}
+
+export const SPEC_BY_KEY: ReadonlyMap<string, CanSpec> = buildSpecMap(SPECS);
+
 function lexLess(a: Score, b: Score): boolean {
   if (a[0] !== b[0]) {return a[0] < b[0];}
   if (a[1] !== b[1]) {return a[1] < b[1];}
@@ -367,53 +373,57 @@ function prepareInputs(cans: readonly Can[]): SolverInputs {
   return { n: cans.length, caps, empties, init, totalFuel };
 }
 
-function groupCansBySpec(cans: readonly Can[]): GroupedCans[] {
-  return SPECS.map((spec) => ({
-    spec,
-    indices: cans
-      .map((c, idx) => ({ c, idx }))
-      .filter(({ c }) => c.spec.key === spec.key)
-      .sort((a, b) => b.c.fuel - a.c.fuel)
-      .map(({ idx }) => idx),
-  }));
+function groupCansBySpec(cans: readonly Can[], specs: readonly CanSpec[]): GroupedCans[] {
+  const grouped: GroupedCans[] = [];
+  const indexByKey = new Map<string, number>();
+
+  specs.forEach((spec) => {
+    indexByKey.set(spec.key, grouped.length);
+    grouped.push({ spec, indices: [] });
+  });
+
+  cans.forEach((c, idx) => {
+    const key = c.spec.key;
+    let groupIdx = indexByKey.get(key);
+    if (groupIdx === undefined) {
+      groupIdx = grouped.length;
+      indexByKey.set(key, groupIdx);
+      grouped.push({ spec: c.spec, indices: [] });
+    }
+    const group = grouped[groupIdx];
+    group.indices.push(idx);
+  });
+
+  grouped.forEach((group) => {
+    group.indices.sort((a, b) => {
+      const aFuel = cans[a]?.fuel ?? 0;
+      const bFuel = cans[b]?.fuel ?? 0;
+      return bFuel - aFuel;
+    });
+  });
+
+  return grouped;
 }
 
 function estimateWorkload(grouped: readonly GroupedCans[], n: number): number {
-  const lenA = grouped[0]?.indices.length ?? 0;
-  const lenB = grouped[1]?.indices.length ?? 0;
-  return (lenA + 1) * (lenB + 1) * n;
-}
-
-function neededGroupC(totalFuel: number, capAB: number, groupC: GroupedCans | undefined): number {
-  const remaining = totalFuel - capAB;
-  if (remaining <= 0) {return 0;}
-  const capC = groupC?.spec.capacity ?? Infinity;
-  return Math.ceil(remaining / capC);
-}
-
-function emptyCostForCounts(emptyAB: number, groupC: GroupedCans | undefined, neededC: number): number {
-  return emptyAB + (groupC?.spec.emptyWeight ?? 0) * neededC;
+  const product = grouped.reduce((acc, group) => acc * (group.indices.length + 1), 1);
+  // Guard against overflow if specs grow unexpectedly large.
+  if (!Number.isFinite(product)) {return Number.MAX_SAFE_INTEGER;}
+  return product * n;
 }
 
 function buildKeepMask(
   grouped: readonly GroupedCans[],
-  keepA: number,
-  keepB: number,
-  keepC: number,
+  keepCounts: readonly number[],
   n: number
 ): boolean[] {
   const keep: boolean[] = Array<boolean>(n).fill(false);
-  const groupA = grouped[0];
-  const groupB = grouped[1];
-  const groupC = grouped[2];
-  if (groupA) {
-    for (const idx of groupA.indices.slice(0, keepA)) {keep[idx] = true;}
-  }
-  if (groupB) {
-    for (const idx of groupB.indices.slice(0, keepB)) {keep[idx] = true;}
-  }
-  if (groupC) {
-    for (const idx of groupC.indices.slice(0, keepC)) {keep[idx] = true;}
+  for (let i = 0; i < grouped.length; i++) {
+    const group = grouped[i];
+    const count = keepCounts[i] ?? 0;
+    for (const idx of group.indices.slice(0, count)) {
+      keep[idx] = true;
+    }
   }
   return keep;
 }
@@ -557,41 +567,54 @@ function buildPlanForKeep(keep: readonly boolean[], inputs: SolverInputs): BestS
 }
 
 function findBestPlan(inputs: SolverInputs, grouped: readonly GroupedCans[]): BestSolution | null {
-  const lenA = grouped[0]?.indices.length ?? 0;
-  const lenB = grouped[1]?.indices.length ?? 0;
-  const lenC = grouped[2]?.indices.length ?? 0;
+  const groupCount = grouped.length;
+  const maxCapSuffix: number[] = Array<number>(groupCount + 1).fill(0);
+  for (let i = groupCount - 1; i >= 0; i--) {
+    const group = grouped[i];
+    const capHere = (group?.spec.capacity ?? 0) * (group?.indices.length ?? 0);
+    maxCapSuffix[i] = maxCapSuffix[i + 1] + capHere;
+  }
 
+  const keepCounts: number[] = Array<number>(groupCount).fill(0);
   let best: BestSolution | null = null;
-  const groupA = grouped[0];
-  const groupB = grouped[1];
-  const groupC = grouped[2];
 
-  for (let keepA = 0; keepA <= lenA; keepA++) {
-    const capA = (groupA?.spec.capacity ?? 0) * keepA;
-    const emptyA = (groupA?.spec.emptyWeight ?? 0) * keepA;
-    for (let keepB = 0; keepB <= lenB; keepB++) {
-      const capAB = capA + (groupB?.spec.capacity ?? 0) * keepB;
-      const emptyAB = emptyA + (groupB?.spec.emptyWeight ?? 0) * keepB;
-
-      const neededC = neededGroupC(inputs.totalFuel, capAB, groupC);
-      if (neededC > lenC) {continue;}
-
-      const emptyTotal = emptyCostForCounts(emptyAB, groupC, neededC);
-      if (best && emptyTotal > best.score[0] && capAB >= inputs.totalFuel) {break;}
-      if (best && emptyTotal > best.score[0]) {continue;}
-
-      const keepMask = buildKeepMask(grouped, keepA, keepB, neededC, inputs.n);
+  const dfs = (idx: number, capSoFar: number, emptySoFar: number): void => {
+    if (idx === groupCount) {
+      if (capSoFar < inputs.totalFuel) {return;}
+      const keepMask = buildKeepMask(grouped, keepCounts, inputs.n);
       const candidate = buildPlanForKeep(keepMask, inputs);
-      if (!candidate) {continue;}
+      if (!candidate) {return;}
       if (!best || lexLess(candidate.score, best.score)) {
         best = candidate;
       }
+      return;
     }
-  }
+
+    const group = grouped[idx];
+    if (!group) {return;}
+    const len = group.indices.length;
+    const capPer = group.spec.capacity;
+    const emptyPer = group.spec.emptyWeight;
+    const remainingCap = maxCapSuffix[idx + 1];
+
+    for (let keep = 0; keep <= len; keep++) {
+      const newCap = capSoFar + capPer * keep;
+      const capNeeded = inputs.totalFuel - newCap;
+      if (capNeeded > remainingCap) {continue;}
+
+      const newEmpty = emptySoFar + emptyPer * keep;
+      if (best && newEmpty > best.score[0]) {continue;}
+
+      keepCounts[idx] = keep;
+      dfs(idx + 1, newCap, newEmpty);
+    }
+  };
+
+  dfs(0, 0, 0);
   return best;
 }
 
-async function solve(cans: readonly Can[]): Promise<Plan> {
+async function solve(cans: readonly Can[], specs: readonly CanSpec[]): Promise<Plan> {
   performance.mark("solver-start");
 
   const inputs = prepareInputs(cans);
@@ -601,7 +624,7 @@ async function solve(cans: readonly Can[]): Promise<Plan> {
     return emptyPlan(inputs.n);
   }
 
-  const grouped = groupCansBySpec(cans);
+  const grouped = groupCansBySpec(cans, specs);
   const workEstimate = estimateWorkload(grouped, inputs.n);
   if (workEstimate > 5_000_000) {
     throw new Error("Too many cans for the browser solver (try reducing to ~300 cans)");
@@ -657,8 +680,11 @@ function assignIds(cans: Can[]): void {
  * // plan.transfers[1][0] === 30 (transfer 30g from can 1 to can 0)
  * ```
  */
-export async function computePlan(cans: readonly Can[]): Promise<SolutionResult> {
+export async function computePlan(
+  cans: readonly Can[],
+  specs: readonly CanSpec[] = SPECS
+): Promise<SolutionResult> {
   assignIds([...cans]);
-  const plan = await solve(cans);
+  const plan = await solve(cans, specs);
   return { plan, cans };
 }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Calculate the optimal way to consolidate MSR 110g, 227g, and 450g isobutane fuel canisters so you carry the fewest, lightest cans.">
+  <meta name="description" content="Calculate the optimal way to consolidate mixed isobutane fuel canisters—pick your can types and minimize the empty weight you carry.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://fuel.for.alienz.org/">
   <link rel="icon" type="image/png" sizes="32x32" href="./dist/favicon-32x32.png">
@@ -12,7 +12,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="./dist/favicon-192x192.png">
   <link rel="shortcut icon" href="./favicon.ico">
   <meta property="og:title" content="Fuel Canister Transfer Calculator">
-  <meta property="og:description" content="Enter gross weights for MSR 110g, 227g, and 450g isobutane canisters and get an optimal transfer plan to minimize pack weight.">
+  <meta property="og:description" content="Enter gross weights for your isobutane canisters, choose their types, and get an optimal transfer plan to minimize pack weight.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://fuel.for.alienz.org/">
   <meta property="og:image" content="https://fuel.for.alienz.org/dist/social-card.jpg">
@@ -21,7 +21,7 @@
   <meta property="og:image:type" content="image/jpeg">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Fuel Canister Transfer Calculator">
-  <meta name="twitter:description" content="Optimize MSR isobutane fuel transfers (110g/227g/450g) and carry fewer cans.">
+  <meta name="twitter:description" content="Optimize isobutane fuel transfers across the can sizes you have and carry fewer cans.">
   <meta name="twitter:image" content="https://fuel.for.alienz.org/dist/social-card.jpg">
   <meta name="theme-color" content="#f2f2f2">
   <title>Isobutane Fuel Canister Transfer Calculator</title>
@@ -33,7 +33,7 @@
       "name": "Fuel Canister Transfer Calculator",
       "applicationCategory": "Utility",
       "operatingSystem": "Web",
-      "description": "Calculate the optimal transfer plan for MSR 110g, 227g, and 450g isobutane fuel canisters to minimize weight.",
+      "description": "Calculate the optimal transfer plan for mixed isobutane fuel canisters—select your can types and minimize weight.",
       "url": "https://fuel.for.alienz.org/",
       "image": "https://fuel.for.alienz.org/dist/social-card.jpg",
       "offers": {
@@ -50,14 +50,15 @@
   <div class="shell">
     <header>
       <h1>Fuel Canister Transfer Calculator</h1>
-      <p>Have too many partially used MSR canisters? Want to minimize the weight and time it takes to consolidate them?</p>
-      <p>Enter the gross weight of all your canisters below and the optimal plan will be calculated for you.</p>
+      <p>Have too many partially used canisters? Choose their types, enter gross weights, and let the solver minimize what you carry.</p>
+      <p>Pick a can type for each column below, then type the gross weights of every can you have.</p>
     </header>
     <section class="info" aria-labelledby="how-to" hidden>
       <h2 id="how-to">How to use the calculator</h2>
-      <p>Supported sizes: MSR isobutane fuel canisters at 110g, 227g, and 450g. Gross weight = can weight + remaining fuel.</p>
+      <p>Supported sizes: any isobutane canisters you add to the list (defaults include MSR 110g/227g/450g). Gross weight = can weight + remaining fuel.</p>
       <ul>
-        <li>Type the gross weight (in grams) of each can by size. Add as many rows as you have cans.</li>
+        <li>Select the can type for each column, then type the gross weight (in grams) of each can you have.</li>
+        <li>Use “Add column” to track extra can families or remove a column you don't need.</li>
         <li>The solver finds an optimal transfer plan that reduces total cans carried and empty weight.</li>
         <li>See a donor/recipient graph, exact gram transfers, and total carry weight once inputs are valid.</li>
       </ul>
@@ -68,7 +69,13 @@
       </div>
       <template id="column-template">
         <div class="column" data-spec="">
-          <h2 data-part="name"></h2>
+          <div class="column-head">
+            <label class="spec-picker">
+              <span class="sr-only">Can type</span>
+              <select data-part="spec-select"></select>
+            </label>
+            <button type="button" class="ghost-btn remove-column" aria-label="Remove column">×</button>
+          </div>
           <p class="hint" data-part="hint"></p>
           <div class="cells" data-spec=""></div>
         </div>

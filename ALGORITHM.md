@@ -8,16 +8,16 @@ The fuel can packer solves an optimization problem: given a set of partially-fil
 
 The solver uses a **greedy search with backtracking** strategy that explores the solution space systematically:
 
-### 1. **Grouping and Pruning** (solver.ts:333-355)
+### 1. **Grouping and Pruning** (solver.ts)
 
-Cans are first grouped by specification (110g, 227g, 450g) and sorted by fuel level within each group. This enables efficient pruning of the search space based on capacity calculations:
+Cans are grouped by specification (any number of can types) and sorted by fuel level within each group. This enables efficient pruning of the search space based on capacity calculations:
 
 ```typescript
-function groupCansBySpec(cans: readonly Can[]): GroupedCans[]
+function groupCansBySpec(cans: readonly Can[], specs: readonly CanSpec[]): GroupedCans[]
 function estimateWorkload(grouped: readonly GroupedCans[], n: number): number
 ```
 
-The algorithm iterates through all valid combinations of (keepA, keepB, keepC) counts for each can size, pruning branches where:
+The algorithm iterates through all valid combinations of keep-counts per can size, pruning branches where:
 - Capacity is insufficient to hold all fuel
 - Empty weight already exceeds the current best solution
 
@@ -45,7 +45,7 @@ Comparison is lexicographic: prefer lower empty weight, then fewer transfers, th
 ## Time Complexity
 
 ### Worst Case
-- **Outer loop**: O(lenA × lenB × lenC) where lenA, lenB, lenC are counts of each can type
+- **Outer loop**: O(∏(lenᵢ + 1)) where lenᵢ are counts of each can type (product across all specs)
   - For n cans evenly distributed: O(n³/27)
 - **Allocation subproblem**: O(D × R × E) where:
   - D = number of donors
@@ -62,7 +62,7 @@ Comparison is lexicographic: prefer lower empty weight, then fewer transfers, th
 
 The workload estimate serves as a complexity guard:
 ```typescript
-workload = (lenA + 1) × (lenB + 1) × n
+workload = (len0 + 1) × (len1 + 1) × ... × (lenK + 1) × n
 if (workload > 5_000_000) throw Error
 ```
 
@@ -89,7 +89,7 @@ This limits inputs to approximately:
 
 ### Slow Path
 - **Many cans near capacity**: Requires extensive transfer exploration
-- **Mixed can sizes with tight constraints**: All three sizes active in solution
+- **Mixed can sizes with tight constraints**: Multiple size families active in solution
 - **High donor/recipient ratio**: More transfer combinations to explore
 
 ### Optimization Strategies Employed
@@ -116,7 +116,7 @@ This limits inputs to approximately:
 - Fuel values are non-negative
 - Transfer operations are instantaneous and lossless
 - Empty weight is fixed per can specification
-- Only three can sizes supported (hardcoded)
+- Any number of can sizes can be defined up front (defaults provided in `SPECS`)
 
 ## Future Improvements
 

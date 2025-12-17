@@ -1,5 +1,5 @@
 import "./styles.css";
-import { SPECS, type Can, type Plan, type CanSpec } from "./solver";
+import { SPECS, SPEC_BY_KEY, type Can, type Plan, type CanSpec } from "./solver";
 
 // UI Constants
 const COMPUTE_DEBOUNCE_MS = 350;
@@ -22,6 +22,11 @@ interface FillColors {
 }
 
 type FillState = "normal" | "overflow" | "underflow";
+
+interface ColumnState {
+  id: string;
+  specKey: string;
+}
 
 function fillColors(fuel: number, capacity: number): FillColors {
   if (fuel > capacity) {
@@ -68,6 +73,15 @@ function applyFillStyle(
   }
 }
 
+function lookupSpec(specKey: string | undefined): CanSpec | undefined {
+  if (!specKey) {return undefined;}
+  return SPEC_BY_KEY.get(specKey);
+}
+
+function ensureSpec(specKey: string | undefined): CanSpec | undefined {
+  return lookupSpec(specKey) ?? SPECS[0];
+}
+
 // DOM interaction
 const formEl = document.getElementById("pack-form") as HTMLFormElement;
 const columnsEl = document.getElementById("columns") as HTMLDivElement;
@@ -92,6 +106,16 @@ let hoverStyleEl: HTMLStyleElement | null = null;
 let computeTimer: number | null = null;
 let currentRequestId = 0;
 let pendingWorker: Worker | null = null;
+let columnIdCounter = 0;
+
+function nextColumnId(): string {
+  columnIdCounter += 1;
+  return `col-${Date.now()}-${columnIdCounter}`;
+}
+
+const columnsState: ColumnState[] = SPECS.length
+  ? SPECS.map((spec) => ({ id: nextColumnId(), specKey: spec.key }))
+  : [{ id: nextColumnId(), specKey: "" }];
 
 type StatusState = "idle" | "solving" | "success" | "error";
 
@@ -190,7 +214,8 @@ function bindCell(
     );
     const lastInput = cells[cells.length - 1];
     if (input.value !== "" && lastInput === input) {
-      appendCell(cellsContainer, specKey);
+      const nextSpecKey = cellsContainer.getAttribute("data-spec") ?? input.dataset["spec"] ?? specKey;
+      appendCell(cellsContainer, nextSpecKey);
     }
 
     cleanupEmptyCells(cellsContainer);
@@ -201,43 +226,115 @@ function bindCell(
   updateCellFill(cell, input);
 }
 
-function createColumn(spec: CanSpec): { column: HTMLDivElement; cellsContainer: HTMLDivElement } {
-  const fallback = (): { column: HTMLDivElement; cellsContainer: HTMLDivElement } => {
+function populateSpecSelect(select: HTMLSelectElement, selectedKey: string): void {
+  select.innerHTML = "";
+  let found = false;
+  for (const spec of SPECS) {
+    const option = document.createElement("option");
+    option.value = spec.key;
+    option.textContent = spec.name;
+    if (spec.key === selectedKey) {
+      option.selected = true;
+      found = true;
+    }
+    select.appendChild(option);
+  }
+  if (!found && selectedKey) {
+    const option = document.createElement("option");
+    option.value = selectedKey;
+    option.textContent = selectedKey;
+    option.selected = true;
+    select.appendChild(option);
+  }
+}
+
+function applyColumnSpec(
+  column: HTMLDivElement,
+  cellsContainer: HTMLDivElement | null,
+  hintEl: HTMLElement | null,
+  spec: CanSpec | undefined
+): void {
+  const specKey = spec?.key ?? "";
+  column.dataset["spec"] = specKey;
+  if (cellsContainer) {
+    cellsContainer.dataset["spec"] = specKey;
+  }
+  if (hintEl) {
+    hintEl.textContent = spec
+      ? `Capacity: ${spec.capacity}g • Empty: ${spec.emptyWeight}g`
+      : "Select a can type to see capacity and empty weight.";
+  }
+  if (cellsContainer) {
+    cellsContainer.querySelectorAll<HTMLInputElement>("input").forEach((input) => {
+      input.dataset["spec"] = specKey;
+      const cell = input.closest<HTMLDivElement>(".cell");
+      if (cell) {updateCellFill(cell, input);}
+    });
+  }
+}
+
+function createColumn(
+  state: ColumnState
+): {
+  column: HTMLDivElement;
+  cellsContainer: HTMLDivElement;
+  select: HTMLSelectElement | null;
+  hint: HTMLElement | null;
+  removeBtn: HTMLButtonElement | null;
+} {
+  const spec = ensureSpec(state.specKey);
+  const fallback = (): {
+    column: HTMLDivElement;
+    cellsContainer: HTMLDivElement;
+    select: HTMLSelectElement | null;
+    hint: HTMLElement | null;
+    removeBtn: HTMLButtonElement | null;
+  } => {
     const column = document.createElement("div");
     column.className = "column";
-    column.dataset["spec"] = spec.key;
+    column.dataset["spec"] = spec?.key ?? "";
+    column.dataset["columnId"] = state.id;
 
-    const heading = document.createElement("h2");
-    heading.textContent = spec.name;
-    column.appendChild(heading);
+    const head = document.createElement("div");
+    head.className = "column-head";
+    const select = document.createElement("select");
+    populateSpecSelect(select, spec?.key ?? "");
+    head.appendChild(select);
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "ghost-btn remove-column";
+    removeBtn.textContent = "×";
+    head.appendChild(removeBtn);
+    column.appendChild(head);
 
     const hint = document.createElement("p");
     hint.className = "hint";
-    hint.textContent = `Capacity: ${spec.capacity}g • Empty: ${spec.emptyWeight}g`;
     column.appendChild(hint);
 
     const cellsContainer = document.createElement("div");
     cellsContainer.className = "cells";
-    cellsContainer.dataset["spec"] = spec.key;
+    cellsContainer.dataset["spec"] = spec?.key ?? "";
     column.appendChild(cellsContainer);
 
-    return { column, cellsContainer };
+    applyColumnSpec(column, cellsContainer, hint, spec);
+    return { column, cellsContainer, select, hint, removeBtn };
   };
 
   if (!columnTemplateEl?.content) {return fallback();}
   const fragment = columnTemplateEl.content.cloneNode(true) as DocumentFragment;
   const column = fragment.querySelector<HTMLDivElement>(".column");
   const cellsContainer = fragment.querySelector<HTMLDivElement>(".cells");
-  const heading = fragment.querySelector<HTMLElement>('[data-part="name"]');
   const hint = fragment.querySelector<HTMLElement>('[data-part="hint"]');
-  if (!column || !cellsContainer || !heading || !hint) {return fallback();}
+  const select = fragment.querySelector<HTMLSelectElement>('select[data-part="spec-select"]');
+  const removeBtn = fragment.querySelector<HTMLButtonElement>(".remove-column");
+  if (!column || !cellsContainer || !hint || !select || !removeBtn) {return fallback();}
 
-  column.dataset["spec"] = spec.key;
-  cellsContainer.dataset["spec"] = spec.key;
-  heading.textContent = spec.name;
-  hint.textContent = `Capacity: ${spec.capacity}g • Empty: ${spec.emptyWeight}g`;
+  column.dataset["spec"] = spec?.key ?? "";
+  column.dataset["columnId"] = state.id;
+  populateSpecSelect(select, spec?.key ?? "");
+  applyColumnSpec(column, cellsContainer, hint, spec);
 
-  return { column, cellsContainer };
+  return { column, cellsContainer, select, hint, removeBtn };
 }
 
 function appendCell(cellsContainer: Element, specKey: string): void {
@@ -268,18 +365,109 @@ function cleanupEmptyCells(cellsContainer: Element): void {
   }
 }
 
+function bindColumnControls(
+  state: ColumnState,
+  column: HTMLDivElement,
+  cellsContainer: HTMLDivElement,
+  select: HTMLSelectElement | null,
+  hint: HTMLElement | null,
+  removeBtn: HTMLButtonElement | null
+): void {
+  if (select) {
+    select.addEventListener("change", () => {
+      const newKey = select.value;
+      state.specKey = newKey;
+      const spec = ensureSpec(newKey);
+      applyColumnSpec(column, cellsContainer, hint, spec);
+      populateSpecSelect(select, spec?.key ?? newKey);
+      scheduleCompute();
+    });
+  }
+  if (removeBtn) {
+    removeBtn.addEventListener("click", () => {
+      removeColumn(state.id);
+    });
+  }
+}
+
+function updateRemoveButtons(): void {
+  const disableRemove = columnsState.length <= 1;
+  columnsEl.querySelectorAll<HTMLButtonElement>(".remove-column").forEach((btn) => {
+    btn.disabled = disableRemove;
+    btn.setAttribute("aria-disabled", disableRemove ? "true" : "false");
+  });
+}
+
+function createAddColumnTile(): HTMLDivElement {
+  const tile = document.createElement("div");
+  tile.className = "column add-column";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "ghost-btn add-column-btn";
+  button.setAttribute("aria-label", "Add column");
+  button.textContent = "+";
+  button.addEventListener("click", () => {
+    const lastSpec = columnsState[columnsState.length - 1]?.specKey;
+    addColumn(lastSpec);
+    scheduleCompute();
+  });
+  tile.appendChild(button);
+  return tile;
+}
+
+function ensureAddColumnTile(): void {
+  const existing = columnsEl.querySelector<HTMLDivElement>(".column.add-column");
+  const tile = existing ?? createAddColumnTile();
+  if (!existing) {
+    columnsEl.appendChild(tile);
+    return;
+  }
+  if (columnsEl.lastElementChild !== tile) {
+    columnsEl.appendChild(tile);
+  }
+}
+
+function addColumn(specKey?: string): void {
+  const spec = ensureSpec(specKey) ?? ensureSpec(SPECS[0]?.key);
+  const key = spec?.key ?? "";
+  const state: ColumnState = { id: nextColumnId(), specKey: key };
+  columnsState.push(state);
+  const addTile = columnsEl.querySelector<HTMLDivElement>(".column.add-column");
+  addTile?.remove();
+  const { column, cellsContainer, select, hint, removeBtn } = createColumn(state);
+  columnsEl.appendChild(column);
+  bindColumnControls(state, column, cellsContainer, select, hint, removeBtn);
+  appendCell(cellsContainer, key);
+  ensureAddColumnTile();
+  updateRemoveButtons();
+}
+
+function removeColumn(id: string): void {
+  if (columnsState.length <= 1) {return;}
+  const idx = columnsState.findIndex((c) => c.id === id);
+  if (idx < 0) {return;}
+  columnsState.splice(idx, 1);
+  columnsEl.querySelector<HTMLDivElement>(`.column[data-column-id="${id}"]`)?.remove();
+  ensureAddColumnTile();
+  updateRemoveButtons();
+  scheduleCompute();
+}
+
 function renderColumns(): void {
   columnsEl.innerHTML = "";
-  for (const spec of SPECS) {
-    const { column, cellsContainer } = createColumn(spec);
+  for (const state of columnsState) {
+    const { column, cellsContainer, select, hint, removeBtn } = createColumn(state);
     columnsEl.appendChild(column);
-    appendCell(cellsContainer, spec.key);
+    bindColumnControls(state, column, cellsContainer, select, hint, removeBtn);
+    appendCell(cellsContainer, state.specKey);
   }
+  ensureAddColumnTile();
+  updateRemoveButtons();
 }
 
 function updateCellFill(cell: HTMLDivElement, input: HTMLInputElement): void {
   const specKey = input.dataset["spec"] ?? input.name.split("_")[1];
-  const spec = SPECS.find((s) => s.key === specKey);
+  const spec = lookupSpec(specKey);
   if (!spec) {return;}
 
   if (input.value === "") {
@@ -382,8 +570,12 @@ async function runCompute(): Promise<void> {
     cell.removeAttribute("data-can-num");
   });
 
-  for (const spec of SPECS) {
-    const cells = columnsEl.querySelectorAll<HTMLInputElement>(`.cells[data-spec="${spec.key}"] input`);
+  const columnEls = Array.from(columnsEl.querySelectorAll<HTMLDivElement>(".column"))
+    .filter((col) => !col.classList.contains("add-column"));
+  for (const column of columnEls) {
+    const spec = ensureSpec(column.dataset["spec"]);
+    if (!spec) {continue;}
+    const cells = column.querySelectorAll<HTMLInputElement>(".cells input");
 
     for (const input of Array.from(cells)) {
       const gross = parseFloat(input.value);

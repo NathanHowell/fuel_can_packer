@@ -19,6 +19,24 @@ function makeCan(spec: CanSpec, fuel: number): Can {
   return { id: 0, spec, fuel, gross: spec.emptyWeight + fuel };
 }
 
+void test("supports additional can specs beyond defaults", async () => {
+  const msr800: CanSpec = { key: "msr800", name: "MSR 800g", capacity: 800, emptyWeight: 320 };
+  const specs = [...SPECS, msr800];
+  const cans: Can[] = [
+    makeCan(msr800, 700),
+    makeCan(msr450, 200),
+    makeCan(msr227, 0),
+  ];
+
+  const { plan } = await computePlan(cans, specs);
+
+  assert.deepEqual(plan.keep, [true, false, true]);
+  assert.deepEqual(plan.final_fuel, [700, 0, 200]);
+
+  const totalFuel = plan.final_fuel.reduce((a, b) => a + b, 0);
+  assert.equal(totalFuel, 900);
+});
+
 void test("consolidates fuel into a single 227g can when possible", async () => {
   const cans: Can[] = [
     makeCan(msr227, 180),
