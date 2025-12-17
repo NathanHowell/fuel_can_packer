@@ -140,6 +140,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["dist/", "node_modules/", "_site/", "tailwind.config.ts"],
+    ignores: ["dist/", "node_modules/", "_site/"],
   }
 );
