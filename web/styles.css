@@ -163,6 +163,10 @@
     @apply grid gap-3;
   }
 
+  .results[data-loading="true"] {
+    @apply opacity-50 pointer-events-none transition-opacity duration-150 ease-in-out;
+  }
+
   .graph-panel {
     @apply relative border border-border rounded-lg p-4 bg-slate-50 min-h-[240px] overflow-hidden;
   }

@@ -303,8 +303,10 @@ function startWorkerSolve(requestId: number, cans: Can[]): void {
       renderGraph(canObjects, plan);
       renderTextOutput(canObjects, plan);
       resultsEl.setAttribute("data-visible", "true");
+      resultsEl.removeAttribute("data-loading");
       setStatus("success", "Complete");
     } else {
+      resultsEl.removeAttribute("data-loading");
       setStatus("error", `Error: ${data.error}`);
     }
   };
@@ -316,6 +318,7 @@ function startWorkerSolve(requestId: number, cans: Can[]): void {
     if (!isCurrent) {
       return;
     }
+    resultsEl.removeAttribute("data-loading");
     setStatus("error", `Error: ${message}`);
   };
 
@@ -365,6 +368,7 @@ async function runCompute(): Promise<void> {
       inputErrorsEl.setAttribute("data-visible", "false");
     }
     resultsEl.setAttribute("data-visible", "false");
+    resultsEl.removeAttribute("data-loading");
     donorColumnEl.innerHTML = "";
     recipientColumnEl.innerHTML = "";
     graphSvgEl.innerHTML = "";
@@ -385,6 +389,7 @@ async function runCompute(): Promise<void> {
       }
     }
     resultsEl.setAttribute("data-visible", "false");
+    resultsEl.removeAttribute("data-loading");
     donorColumnEl.innerHTML = "";
     recipientColumnEl.innerHTML = "";
     graphSvgEl.innerHTML = "";
@@ -396,7 +401,8 @@ async function runCompute(): Promise<void> {
   if (inputErrorsEl !== null) {
     inputErrorsEl.setAttribute("data-visible", "false");
   }
-  resultsEl.setAttribute("data-visible", "false");
+  resultsEl.setAttribute("data-visible", "true");
+  resultsEl.setAttribute("data-loading", "true");
 
   startWorkerSolve(requestId, cans);
 }
