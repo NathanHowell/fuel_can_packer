@@ -11,8 +11,26 @@ import {
 } from "esbuild";
 import postcss from "postcss";
 import tailwindcss from "@tailwindcss/postcss";
-import { readFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import sharp from "sharp";
+
+interface RgbaColor {
+  r: number;
+  g: number;
+  b: number;
+  alpha: number;
+}
+
+async function averageBackgroundColor(imagePath: string): Promise<RgbaColor> {
+  const { data } = await sharp(imagePath)
+    .resize(1, 1, { fit: "cover" })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const [r = 242, g = 242, b = 242] = data;
+  return { r, g, b, alpha: 1 };
+}
 
 const isWatch: boolean = process.argv.includes("--watch");
 const isProd: boolean =
@@ -55,6 +73,65 @@ function createPostcssPlugin(): Plugin {
   };
 }
 
+function createSocialCardPlugin(): Plugin {
+  const sourceFilename = "social-card.png";
+  const outputs: readonly {
+    filename: string;
+    format: "jpeg" | "webp";
+    quality: number;
+  }[] = [
+    { filename: "social-card.jpg", format: "jpeg", quality: 84 },
+    { filename: "social-card.webp", format: "webp", quality: 82 },
+  ];
+
+  return {
+    name: "social-card",
+    setup(buildCtx: PluginBuild): void {
+      buildCtx.onStart(async (): Promise<void> => {
+        const cwd = buildCtx.initialOptions.absWorkingDir ?? process.cwd();
+        const sourcePath = join(cwd, sourceFilename);
+        const outputDir = "dist";
+        await mkdir(join(cwd, outputDir), { recursive: true });
+        const background = await averageBackgroundColor(sourcePath);
+        const resized = sharp(sourcePath).resize({
+          width: 1200,
+          height: 630,
+          fit: "contain",
+          position: "center",
+          background,
+          withoutEnlargement: true,
+        });
+
+        await Promise.all(
+          outputs.map(async ({ filename, format, quality }) => {
+            const outputPath = join(cwd, outputDir, filename);
+            const pipeline = resized.clone();
+            if (format === "jpeg") {
+              await pipeline
+                .jpeg({
+                  quality,
+                  progressive: true,
+                  chromaSubsampling: "4:4:4",
+                })
+                .toFile(outputPath);
+              return;
+            }
+            await pipeline
+              .webp({
+                quality,
+                effort: 5,
+              })
+              .toFile(outputPath);
+          }),
+        );
+
+        const filenames = outputs.map(({ filename }): string => filename).join(", ");
+        console.log(`Generated social card (1200x630) in ${outputDir}: ${filenames}`);
+      });
+    },
+  };
+}
+
 const buildOptions: BuildOptions = {
   entryPoints: ["./app.ts", "./solver-worker.ts"],
   bundle: true,
@@ -67,7 +144,7 @@ const buildOptions: BuildOptions = {
   entryNames: "[name]",
   // eslint-disable-next-line @typescript-eslint/naming-convention
   loader: { ".css": "css" },
-  plugins: [createPostcssPlugin()],
+  plugins: [createPostcssPlugin(), createSocialCardPlugin()],
   logLevel: "info",
 };
 

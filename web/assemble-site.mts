@@ -42,7 +42,8 @@ async function main(): Promise<void> {
     "favicon.ico",
     "robots.txt",
     "sitemap.xml",
-    "social-card.png",
+    "social-card.jpg",
+    "social-card.webp",
   ];
   for (const file of staticFiles) {
     try {
