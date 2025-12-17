@@ -1,6 +1,12 @@
 import "./styles.css";
 import { SPECS, type Can, type Plan, type CanSpec } from "./solver";
 
+// UI Constants
+const COMPUTE_DEBOUNCE_MS = 350;
+const GRAPH_MIN_STROKE_WIDTH = 1.5;
+const GRAPH_MAX_STROKE_WIDTH = 12;
+const GRAPH_LABEL_SPACING = 16;
+
 function getTransferAmount(plan: Plan, from: number, to: number): number {
   const row = plan.transfers[from];
   return row?.[to] ?? 0;
@@ -301,7 +307,7 @@ function scheduleCompute(): void {
   computeTimer = window.setTimeout(() => {
     computeTimer = null;
     void runCompute();
-  }, 350);
+  }, COMPUTE_DEBOUNCE_MS);
 }
 
 function terminatePendingWorker(): void {
@@ -602,7 +608,6 @@ function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipient
   }
 
   // Offset labels per donor to avoid overlap while keeping the same anchor x
-  const labelSpacing = 16;
   const edgesByFrom = new Map<number, EdgeRender[]>();
   for (const edge of edgesToRender) {
     const list = edgesByFrom.get(edge.fromIdx);
@@ -616,7 +621,7 @@ function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipient
     list.sort((a, b) => a.y2 - b.y2);
     const mid = (list.length - 1) / 2;
     list.forEach((edge, idx) => {
-      edge.labelOffset = (idx - mid) * labelSpacing;
+      edge.labelOffset = (idx - mid) * GRAPH_LABEL_SPACING;
     });
   }
 
@@ -626,12 +631,10 @@ function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipient
 
   // Scale stroke/opacity to grams transferred so thicker flows represent more fuel.
   const maxAmt = edgesToRender.reduce((max, edge) => Math.max(max, edge.amt), 0);
-  const minStroke = 1.5;
-  const maxStroke = 12;
   const strokeForAmt = (amt: number): number => {
-    if (maxAmt <= 0) {return minStroke;}
+    if (maxAmt <= 0) {return GRAPH_MIN_STROKE_WIDTH;}
     const t = Math.sqrt(amt / maxAmt);
-    return minStroke + (maxStroke - minStroke) * t;
+    return GRAPH_MIN_STROKE_WIDTH + (GRAPH_MAX_STROKE_WIDTH - GRAPH_MIN_STROKE_WIDTH) * t;
   };
 
   // Draw thicker flows first so thinner ones sit on top.

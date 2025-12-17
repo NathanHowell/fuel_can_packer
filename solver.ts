@@ -1,16 +1,30 @@
 // Core solver logic for fuel can packing.
 
+/**
+ * Specification for a fuel can type, defining its capacity and weight characteristics.
+ */
 export interface CanSpec {
+  /** Unique identifier for this can specification (e.g., "msr110", "msr227") */
   readonly key: string;
+  /** Human-readable name for display (e.g., "MSR 110g", "MSR 227g") */
   readonly name: string;
+  /** Maximum fuel capacity in grams */
   readonly capacity: number;
+  /** Weight of the empty can in grams */
   readonly emptyWeight: number;
 }
 
+/**
+ * Represents a physical fuel can with its current state.
+ */
 export interface Can {
+  /** Unique identifier for this can instance */
   id: number;
+  /** The specification defining this can's properties */
   spec: CanSpec;
+  /** Current amount of fuel in grams (may exceed capacity initially) */
   fuel: number;
+  /** Total weight of can including fuel in grams */
   gross: number;
 }
 
@@ -20,14 +34,33 @@ interface Edge {
   amt: number;
 }
 
+/**
+ * A fuel transfer plan that optimally redistributes fuel across cans.
+ *
+ * The plan minimizes three objectives in lexicographic order:
+ * 1. Total empty weight of kept cans
+ * 2. Number of transfer operations
+ * 3. Total grams of fuel transferred
+ */
 export interface Plan {
+  /** Array indicating which cans to keep (true) or discard (false) */
   keep: readonly boolean[];
+  /** Final fuel amount in each can after executing all transfers */
   final_fuel: readonly number[];
+  /**
+   * Transfer matrix where transfers[i][j] represents grams to transfer from can i to can j.
+   * Only non-zero values represent actual transfers.
+   */
   transfers: readonly (readonly number[])[];
 }
 
+/**
+ * Result of computing an optimal fuel transfer plan.
+ */
 export interface SolutionResult {
+  /** The computed transfer plan */
   plan: Plan;
+  /** The input cans with assigned IDs */
   cans: readonly Can[];
 }
 
@@ -76,6 +109,10 @@ interface PlanValidationInput {
   totalFuel: number;
 }
 
+/**
+ * Available fuel can specifications.
+ * Currently supports MSR IsoPro canisters in three sizes: 110g, 227g, and 450g.
+ */
 export const SPECS: readonly CanSpec[] = [
   { key: "msr110", name: "MSR 110g", capacity: 110, emptyWeight: 101 },
   { key: "msr227", name: "MSR 227g", capacity: 227, emptyWeight: 147 },
@@ -555,8 +592,14 @@ function findBestPlan(inputs: SolverInputs, grouped: readonly GroupedCans[]): Be
 }
 
 async function solve(cans: readonly Can[]): Promise<Plan> {
+  performance.mark("solver-start");
+
   const inputs = prepareInputs(cans);
-  if (inputs.totalFuel === 0) {return emptyPlan(inputs.n);}
+  if (inputs.totalFuel === 0) {
+    performance.mark("solver-end");
+    performance.measure("solver-total", "solver-start", "solver-end");
+    return emptyPlan(inputs.n);
+  }
 
   const grouped = groupCansBySpec(cans);
   const workEstimate = estimateWorkload(grouped, inputs.n);
@@ -564,8 +607,16 @@ async function solve(cans: readonly Can[]): Promise<Plan> {
     throw new Error("Too many cans for the browser solver (try reducing to ~300 cans)");
   }
 
+  performance.mark("solver-search-start");
   const best = findBestPlan(inputs, grouped);
+  performance.mark("solver-search-end");
+  performance.measure("solver-search", "solver-search-start", "solver-search-end");
+
   if (!best) {throw new Error("No feasible plan found");}
+
+  performance.mark("solver-end");
+  performance.measure("solver-total", "solver-start", "solver-end");
+
   return best.plan;
 }
 
@@ -579,6 +630,33 @@ function assignIds(cans: Can[]): void {
   }
 }
 
+/**
+ * Computes an optimal fuel transfer plan that minimizes carried weight.
+ *
+ * The algorithm uses a greedy search with backtracking to find the plan that:
+ * 1. Minimizes total empty can weight (primary objective)
+ * 2. Minimizes number of transfer operations (secondary objective)
+ * 3. Minimizes total grams transferred (tertiary objective)
+ *
+ * @param cans - Array of cans with their current fuel levels. Fuel values should be
+ *               non-negative. Cans may temporarily exceed capacity during initial state.
+ * @returns A promise resolving to the optimal plan and normalized can array
+ * @throws {Error} When no cans are provided
+ * @throws {Error} When no feasible plan exists (insufficient total capacity)
+ * @throws {Error} When input complexity exceeds ~300 cans (workload > 5M operations)
+ *
+ * @example
+ * ```typescript
+ * const cans = [
+ *   { id: 1, spec: msr227, fuel: 180, gross: 327 },
+ *   { id: 2, spec: msr227, fuel: 30, gross: 177 }
+ * ];
+ * const { plan } = await computePlan(cans);
+ * // plan.keep === [true, false]
+ * // plan.final_fuel === [210, 0]
+ * // plan.transfers[1][0] === 30 (transfer 30g from can 1 to can 0)
+ * ```
+ */
 export async function computePlan(cans: readonly Can[]): Promise<SolutionResult> {
   assignIds([...cans]);
   const plan = await solve(cans);
