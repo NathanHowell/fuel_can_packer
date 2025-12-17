@@ -66,7 +66,7 @@ workerScope.addEventListener("message", async (event: MessageEvent<WorkerRequest
       error: err,
       errorMessage,
       errorStack,
-      errorType: err?.constructor?.name,
+      errorType: (err !== null && typeof err === 'object') ? err.constructor.name : typeof err,
       errorString: String(err),
     });
     

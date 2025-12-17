@@ -345,7 +345,13 @@ function startWorkerSolve(requestId: number, cans: Can[]): void {
       // MessageEvent - log complete details
       debugInfo.push(`MessageEvent type: ${event.type}`);
       debugInfo.push(`Event constructor: ${event.constructor.name}`);
-      debugInfo.push(`Event data: ${JSON.stringify(event.data)}`);
+      
+      // Safe JSON stringification to avoid crashes from circular refs
+      try {
+        debugInfo.push(`Event data: ${JSON.stringify(event.data)}`);
+      } catch {
+        debugInfo.push(`Event data: [Unable to stringify - possibly circular]`);
+      }
       
       // Extract error information from the event
       if (event.data !== null && event.data !== undefined && typeof event.data === 'object') {
@@ -355,7 +361,12 @@ function startWorkerSolve(requestId: number, cans: Can[]): void {
         } else if ('message' in data) {
           message = `Worker message: ${String(data['message'])}`;
         } else {
-          message = `Worker error (MessageEvent): ${JSON.stringify(event.data)}`;
+          // Safe JSON stringification for message
+          try {
+            message = `Worker error (MessageEvent): ${JSON.stringify(event.data)}`;
+          } catch {
+            message = `Worker error (MessageEvent): [Unable to stringify data]`;
+          }
         }
       } else {
         message = "Worker error (unknown MessageEvent data)";
