@@ -19,7 +19,7 @@ function makeCan(spec: CanSpec, fuel: number): Can {
   return { id: 0, spec, fuel, gross: spec.emptyWeight + fuel };
 }
 
-test("consolidates fuel into a single 227g can when possible", async () => {
+void test("consolidates fuel into a single 227g can when possible", async () => {
   const cans: Can[] = [
     makeCan(msr227, 180),
     makeCan(msr227, 30),
@@ -35,7 +35,7 @@ test("consolidates fuel into a single 227g can when possible", async () => {
   assert.equal(totalFuel, 210);
 });
 
-test("picks the lightest feasible can combination for mixed sizes", async () => {
+void test("picks the lightest feasible can combination for mixed sizes", async () => {
   const cans: Can[] = [
     makeCan(msr110, 90),
     makeCan(msr227, 200),
@@ -53,7 +53,7 @@ test("picks the lightest feasible can combination for mixed sizes", async () => 
   assert.equal(totalFuel, 390);
 });
 
-test("returns empty plan when every can is empty", async () => {
+void test("returns empty plan when every can is empty", async () => {
   const cans: Can[] = [
     makeCan(msr110, 0),
     makeCan(msr227, 0),
@@ -66,6 +66,6 @@ test("returns empty plan when every can is empty", async () => {
   assert.ok(plan.transfers.flat().every((amt) => amt === 0));
 });
 
-test("throws when no cans are provided", async () => {
+void test("throws when no cans are provided", async () => {
   await assert.rejects(() => computePlan([]), /No cans provided/);
 });
