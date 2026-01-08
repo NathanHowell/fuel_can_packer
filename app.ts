@@ -213,7 +213,8 @@ function createColumn(spec: CanSpec): { column: HTMLDivElement; cellsContainer: 
 
     const hint = document.createElement("p");
     hint.className = "hint";
-    hint.textContent = `Capacity: ${spec.capacity}g • Empty: ${spec.emptyWeight}g`;
+    const grossMax = spec.emptyWeight + spec.capacity;
+    hint.textContent = `Fuel capacity: ${spec.capacity}g • Empty weight: ${spec.emptyWeight}g • Full weight: ${grossMax}g`;
     column.appendChild(hint);
 
     const cellsContainer = document.createElement("div");
@@ -235,7 +236,8 @@ function createColumn(spec: CanSpec): { column: HTMLDivElement; cellsContainer: 
   column.dataset["spec"] = spec.key;
   cellsContainer.dataset["spec"] = spec.key;
   heading.textContent = spec.name;
-  hint.textContent = `Capacity: ${spec.capacity}g • Empty: ${spec.emptyWeight}g`;
+  const grossMax = spec.emptyWeight + spec.capacity;
+  hint.textContent = `Fuel capacity: ${spec.capacity}g • Empty weight: ${spec.emptyWeight}g • Full weight: ${grossMax}g`;
 
   return { column, cellsContainer };
 }
