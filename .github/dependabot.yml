@@ -18,16 +18,18 @@ updates:
     commit-message:
       prefix: "npm"
       include: "scope"
-    # Group minor and patch updates together to reduce PR noise
+    # Group all updates together to ensure compatible versions
     groups:
       development-dependencies:
         dependency-type: "development"
         update-types:
+          - "major"
           - "minor"
           - "patch"
       production-dependencies:
         dependency-type: "production"
         update-types:
+          - "major"
           - "minor"
           - "patch"
     # Review security updates and major version bumps separately
