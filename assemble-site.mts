@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { readdir, mkdir, copyFile, rm } from "node:fs/promises";
+import { readdir, mkdir, copyFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 
 const outputDir = "_site";
 
@@ -29,6 +30,51 @@ async function copyRecursive(src: string, dest: string): Promise<void> {
   }
 }
 
+const SITE_URL = "https://fuel.for.alienz.org";
+
+interface SitemapEntry {
+  readonly path: string;
+  readonly sources: readonly string[];
+  readonly priority: string;
+}
+
+const SITEMAP_ENTRIES: readonly SitemapEntry[] = [
+  { path: "/", sources: ["index.html", "app.ts", "solver.ts", "styles.css"], priority: "1.0" },
+  { path: "/algorithm.html", sources: ["algorithm.html", "styles.css"], priority: "0.6" },
+];
+
+function lastCommitDate(files: readonly string[]): string {
+  try {
+    const out = execFileSync("git", ["log", "-1", "--format=%cs", "--", ...files], {
+      encoding: "utf8",
+    }).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(out)) {
+      return out;
+    }
+  } catch {
+    // fall through to today's date when git metadata is unavailable
+  }
+  return new Date().toISOString().slice(0, 10);
+}
+
+function generateSitemap(): string {
+  const urls = SITEMAP_ENTRIES.map(({ path, sources, priority }) => [
+    "  <url>",
+    `    <loc>${SITE_URL}${path}</loc>`,
+    `    <lastmod>${lastCommitDate(sources)}</lastmod>`,
+    "    <changefreq>monthly</changefreq>",
+    `    <priority>${priority}</priority>`,
+    "  </url>",
+  ].join("\n"));
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...urls,
+    "</urlset>",
+    "",
+  ].join("\n");
+}
+
 async function main(): Promise<void> {
   // Clean output directory
   if (await exists(outputDir)) {
@@ -39,8 +85,9 @@ async function main(): Promise<void> {
   // Copy static files from current directory
   const staticFiles: readonly string[] = [
     "index.html",
+    "algorithm.html",
+    "manifest.webmanifest",
     "robots.txt",
-    "sitemap.xml",
     "_headers",
   ];
   for (const file of staticFiles) {
@@ -54,6 +101,9 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   }
+
+  await writeFile(join(outputDir, "sitemap.xml"), generateSitemap());
+  console.log("Generated sitemap.xml");
 
   // Copy dist directory
   const distSrc = "dist";

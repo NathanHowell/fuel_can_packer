@@ -40,6 +40,24 @@
   .info p { @apply m-0 text-sm text-muted; }
   .info ul { @apply m-0 pl-5 grid gap-1 list-disc; }
   .info li { @apply text-sm text-ink; }
+  .info a, .site-footer a, .article a { @apply text-accent underline; }
+  .info details { @apply text-sm; }
+  .info summary { @apply cursor-pointer font-semibold text-ink; }
+  .info details p { @apply mt-1 pl-4; }
+
+  .table-wrap { @apply overflow-x-auto; }
+  .weights { @apply w-full text-sm border-collapse; }
+  .weights th, .weights td { @apply border border-border px-2 py-1 text-left; }
+  .weights thead th { @apply bg-surface font-semibold; }
+
+  .site-footer { @apply mt-6 text-sm; }
+
+  .article h2 { @apply mt-6 mb-2 text-base font-semibold; }
+  .article h3 { @apply mt-4 mb-1 text-sm font-semibold; }
+  .article p, .article li { @apply text-sm mb-2; }
+  .article ul { @apply pl-5 list-disc; }
+  .article ol { @apply pl-5 list-decimal; }
+  .article pre { @apply font-mono text-xs bg-surface border border-border rounded p-3 overflow-x-auto mb-3; }
 
   .columns {
     @apply grid gap-3;

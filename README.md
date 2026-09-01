@@ -2,7 +2,7 @@
 
 Static web app that computes optimal transfers between MSR 110g, 227g, and 450g fuel canisters to minimize the empty weight you carry. Everything runs client-side using a custom TypeScript solver in a Web Worker.
 
-See [ALGORITHM.md](ALGORITHM.md) for detailed documentation on the optimization algorithm, complexity analysis, and performance characteristics.
+See [ALGORITHM.md](ALGORITHM.md) (published as [algorithm.html](algorithm.html)) for detailed documentation on the optimization algorithm, complexity analysis, and performance characteristics.
 
 ## Development
 - Install dependencies: `npm install`

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="How the isobutane fuel canister transfer calculator works: a greedy search with backtracking that minimizes empty can weight, then transfer count, then grams moved. Complexity, limits, and assumptions.">
+  <meta name="robots" content="index, follow">
+  <meta name="author" content="Nathan Howell">
+  <link rel="canonical" href="https://fuel.for.alienz.org/algorithm.html">
+  <link rel="icon" type="image/png" sizes="32x32" href="./dist/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./dist/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./dist/apple-touch-icon.png">
+  <link rel="shortcut icon" href="./favicon.ico">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta property="og:title" content="How the Fuel Canister Transfer Calculator Works">
+  <meta property="og:description" content="The optimization algorithm behind the isobutane canister consolidation calculator: search strategy, complexity, and limits.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://fuel.for.alienz.org/algorithm.html">
+  <meta property="og:image" content="https://fuel.for.alienz.org/dist/social-card.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="How the Fuel Canister Transfer Calculator Works">
+  <meta name="twitter:description" content="The optimization algorithm behind the isobutane canister consolidation calculator: search strategy, complexity, and limits.">
+  <meta name="twitter:image" content="https://fuel.for.alienz.org/dist/social-card.jpg">
+  <meta name="theme-color" content="#f2f2f2">
+  <title>How the Fuel Canister Transfer Calculator Works</title>
+  <link rel="stylesheet" href="./dist/app.css">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      "headline": "How the Fuel Canister Transfer Calculator Works",
+      "description": "The optimization algorithm behind the isobutane canister consolidation calculator: search strategy, complexity, and limits.",
+      "url": "https://fuel.for.alienz.org/algorithm.html",
+      "image": "https://fuel.for.alienz.org/dist/social-card.jpg",
+      "author": { "@type": "Person", "name": "Nathan Howell", "url": "https://github.com/NathanHowell" },
+      "publisher": { "@type": "Person", "name": "Nathan Howell" },
+      "isPartOf": { "@id": "https://fuel.for.alienz.org/#app" }
+    }
+  </script>
+</head>
+<body>
+  <div class="shell article">
+    <header>
+      <p class="muted"><a href="./">← Back to the calculator</a></p>
+      <h1>How the Fuel Canister Transfer Calculator Works</h1>
+      <p>Given a set of partially filled isobutane cans of various sizes, the solver decides which cans to keep and how to redistribute fuel among them so the total empty weight you carry is minimized while all of your fuel is accommodated.</p>
+    </header>
+
+    <h2>Algorithm approach</h2>
+    <p>The solver uses a <strong>greedy search with backtracking</strong> that explores the solution space systematically in three stages.</p>
+
+    <h3>1. Grouping and pruning</h3>
+    <p>Cans are first grouped by specification (110 g, 227 g, 450 g) and sorted by fuel level within each group. The algorithm then iterates through every valid combination of how many cans of each size to keep, pruning branches where:</p>
+    <ul>
+      <li>the combined capacity is insufficient to hold all fuel, or</li>
+      <li>the combined empty weight already exceeds the best solution found so far.</li>
+    </ul>
+
+    <h3>2. Allocation with minimal transfers</h3>
+    <p>For each candidate set of cans to keep, the solver solves a secondary problem: move fuel from donors (discarded cans, or kept cans that are over capacity) to recipients (kept cans with spare capacity) while minimizing, in order:</p>
+    <ol>
+      <li>the number of transfer operations, and</li>
+      <li>the total grams transferred.</li>
+    </ol>
+    <p>This uses a greedy heuristic for an initial feasible solution, then a depth-first search with memoization under a progressively increasing edge budget, so plans with the fewest transfers are found first.</p>
+
+    <h3>3. Lexicographic optimization</h3>
+    <p>Solutions are compared with a three-part score:</p>
+    <pre><code>type Score = [emptyWeight, transferCount, totalTransferred]</code></pre>
+    <p>Comparison is lexicographic: prefer lower empty weight, then fewer transfers, then less total fuel moved.</p>
+
+    <h2>Time complexity</h2>
+    <h3>Worst case</h3>
+    <ul>
+      <li><strong>Outer loop:</strong> O(lenA × lenB × lenC) over the counts of each can type, roughly O(n³/27) for n cans evenly distributed.</li>
+      <li><strong>Allocation subproblem:</strong> O(D × R × E) where D is the number of donors, R the number of recipients, and E the edge budget.</li>
+      <li><strong>Memoization</strong> removes most repeated subproblems.</li>
+    </ul>
+    <p>Overall O(n³ × D × R × E) in the worst case, but early pruning eliminates most branches and a workload estimator caps total work.</p>
+
+    <h3>Practical performance</h3>
+    <p>A workload estimate acts as a complexity guard:</p>
+    <pre><code>workload = (lenA + 1) × (lenB + 1) × n
+if (workload > 5_000_000) throw Error</code></pre>
+    <p>This allows roughly 300 cans of mixed sizes, more when one size dominates, and gives sub-second results for typical inputs of 10 to 50 cans.</p>
+
+    <h2>Space complexity</h2>
+    <ul>
+      <li>O(n²) for the transfer matrix and the plan representation.</li>
+      <li>The memoization cache is bounded in practice by the workload limit.</li>
+    </ul>
+
+    <h2>Performance characteristics</h2>
+    <h3>Fast paths</h3>
+    <ul>
+      <li>All cans empty: O(n), returns an empty plan immediately.</li>
+      <li>A single can size: O(n²), simplified grouping.</li>
+      <li>Under-filled cans: O(n²), minimal transfers needed.</li>
+    </ul>
+    <h3>Slow paths</h3>
+    <ul>
+      <li>Many cans near capacity, which requires extensive transfer exploration.</li>
+      <li>Mixed sizes with tight constraints where all three sizes appear in the solution.</li>
+      <li>A high donor-to-recipient ratio, which multiplies transfer combinations.</li>
+    </ul>
+    <h3>Optimization strategies</h3>
+    <ol>
+      <li>Early termination when empty weight exceeds the current best.</li>
+      <li>Capacity-based pruning to skip impossible combinations immediately.</li>
+      <li>Greedy initialization, then refinement.</li>
+      <li>Memoization of allocation subproblems keyed by state signature.</li>
+      <li>Edge budget progression, trying simple plans before complex ones.</li>
+    </ol>
+
+    <h2>Limitations</h2>
+    <h3>Input size</h3>
+    <p>About 300 cans for mixed scenarios, enforced by the workload limit. Performance degrades noticeably beyond about 200 cans.</p>
+    <h3>Optimality guarantees</h3>
+    <p>The choice of which cans to keep is globally optimal. The transfer plan within that choice is locally optimal and may not explore every possible transfer ordering.</p>
+    <h3>Assumptions</h3>
+    <ul>
+      <li>Fuel values are non-negative.</li>
+      <li>Transfers are instantaneous and lossless.</li>
+      <li>Empty weight is fixed per can specification.</li>
+      <li>Only three can sizes are supported.</li>
+    </ul>
+
+    <h2>Future improvements</h2>
+    <ol>
+      <li>Branch and bound with tighter lower bounds.</li>
+      <li>A dynamic programming formulation for transfer allocation.</li>
+      <li>Parallel exploration of can combinations across workers.</li>
+      <li>Incremental solving as inputs change.</li>
+      <li>Better initial heuristics to shrink the search.</li>
+    </ol>
+
+    <h2>References</h2>
+    <p>The allocation subproblem is related to bin packing, the transportation problem, and capacity-constrained bipartite assignment. The solver trades guaranteed optimality of the transfer schedule for practical performance, giving excellent results for real-world backpacking scenarios in well under a second.</p>
+
+    <footer class="site-footer">
+      <p class="muted"><a href="./">Fuel canister transfer calculator</a> · <a href="https://github.com/NathanHowell/fuel_can_packer">Source code</a> · Built by <a href="https://github.com/NathanHowell">Nathan Howell</a></p>
+    </footer>
+  </div>
+</body>
+</html>

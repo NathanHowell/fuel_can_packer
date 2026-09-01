@@ -1,0 +1,13 @@
+{
+  "name": "Isobutane Fuel Canister Transfer Calculator",
+  "short_name": "Fuel Cans",
+  "description": "Weigh your 110g, 227g, and 450g isobutane canisters and get the lightest consolidation plan.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2f2f2",
+  "theme_color": "#f2f2f2",
+  "icons": [
+    { "src": "/dist/favicon-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/dist/favicon-512x512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

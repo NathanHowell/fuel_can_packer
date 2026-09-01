@@ -24,7 +24,7 @@
     "backpacking",
     "weight optimization"
   ],
-  "author": "",
+  "author": "Nathan Howell",
   "license": "ISC",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
