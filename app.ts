@@ -149,13 +149,16 @@ function nextInputName(specKey: string): string {
 }
 
 function createCell(specKey: string): { cell: HTMLDivElement; input: HTMLInputElement } {
+  const spec = SPECS.find((s) => s.key === specKey);
+  const minWeight = spec ? String(spec.emptyWeight) : "0";
+
   const fallback = (): { cell: HTMLDivElement; input: HTMLInputElement } => {
     const cell = document.createElement("div");
     cell.className = "cell";
     const input = document.createElement("input");
     input.type = "number";
     input.placeholder = "Gross weight (g)";
-    input.min = "0";
+    input.min = minWeight;
     input.step = "1";
     cell.appendChild(input);
     return { cell, input };
@@ -167,6 +170,7 @@ function createCell(specKey: string): { cell: HTMLDivElement; input: HTMLInputEl
   const input = fragment.querySelector<HTMLInputElement>("input");
   if (!cell || !input) {return fallback();}
   input.dataset["spec"] = specKey;
+  input.min = minWeight;
   return { cell, input };
 }
 
