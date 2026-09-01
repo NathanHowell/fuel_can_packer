@@ -50,7 +50,7 @@
   .weights th, .weights td { @apply border border-border px-2 py-1 text-left; }
   .weights thead th { @apply bg-surface font-semibold; }
 
-  .site-footer { @apply mt-6 text-sm; }
+  .site-footer { @apply mt-6 text-sm grid gap-2; }
 
   .article h2 { @apply mt-6 mb-2 text-base font-semibold; }
   .article h3 { @apply mt-4 mb-1 text-sm font-semibold; }
