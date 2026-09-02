@@ -27,13 +27,17 @@
   form { @apply grid gap-4; }
 }
 
+@utility panel {
+  @apply border border-border rounded-lg;
+}
+
 @layer components {
   .shell {
     @apply w-full max-w-[1100px] bg-panel rounded-lg p-5 shadow-none;
   }
 
   .info {
-    @apply border border-border rounded-lg p-4 bg-white grid gap-2 mb-3;
+    @apply panel p-4 bg-white grid gap-2 mb-3;
   }
 
   .info h2 { @apply m-0 text-base font-semibold; }
@@ -66,7 +70,7 @@
   }
 
   .column {
-    @apply border border-border rounded-lg p-4 grid gap-2 bg-gradient-to-b from-white/5 to-transparent content-start;
+    @apply panel p-4 grid gap-2 bg-gradient-to-b from-white/5 to-transparent content-start;
   }
 
   .column h2 { @apply m-0 text-base font-semibold; }
@@ -74,7 +78,7 @@
   .cells { @apply grid gap-2 content-start; }
 
   .cell {
-    @apply relative flex items-center border border-border rounded-lg bg-white h-14 pl-[42px] pr-3 overflow-hidden;
+    @apply panel relative flex items-center bg-white h-14 pl-[42px] pr-3 overflow-hidden;
     counter-increment: can;
   }
 
@@ -189,7 +193,7 @@
   }
 
   .solution-card {
-    @apply border border-border rounded-lg p-3 bg-white grid gap-2;
+    @apply panel p-3 bg-white grid gap-2;
     align-content: start;
   }
 
@@ -203,7 +207,7 @@
   .solution-list li { @apply leading-snug; }
 
   .graph-panel {
-    @apply relative border border-border rounded-lg p-4 bg-slate-50 min-h-[240px] overflow-hidden;
+    @apply panel relative p-4 bg-slate-50 min-h-[240px] overflow-hidden;
   }
 
   .graph-grid {
@@ -224,7 +228,7 @@
   }
 
   .node {
-    @apply border border-border rounded-lg p-2.5 bg-white grid gap-1 relative overflow-hidden;
+    @apply panel p-2.5 bg-white grid gap-1 relative overflow-hidden;
     z-index: 1;
   }
 
@@ -285,7 +289,7 @@
   }
 
   .status-row {
-    @apply mt-2 flex items-center gap-2 text-sm font-mono border border-border rounded-lg p-4 bg-white;
+    @apply panel mt-2 flex items-center gap-2 text-sm font-mono p-4 bg-white;
   }
 
   .status-icon { @apply text-base w-5 h-5 inline-flex items-center justify-center; }
