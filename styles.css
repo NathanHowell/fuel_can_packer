@@ -22,8 +22,9 @@
     @apply min-h-screen bg-surface text-ink flex justify-center px-4 pt-8 pb-12 sm:px-6 font-sans;
   }
   .muted { @apply text-muted; }
-  header h1 { @apply mb-1 text-lg font-semibold tracking-tight; }
-  header p { @apply mb-5 text-muted; }
+  header { @apply grid gap-2; }
+  header h1 { @apply text-lg font-semibold tracking-tight; }
+  header p { @apply text-muted; }
   form { @apply grid gap-4; }
 }
 
@@ -36,8 +37,16 @@
     @apply w-full max-w-[1100px] bg-panel rounded-lg p-5 shadow-none;
   }
 
+  /* Index page: shell's direct children are a stack of boxes. Space them
+     with one gap here instead of ad hoc margins on each box, so the gap
+     is the same everywhere no matter which two boxes end up adjacent
+     (e.g. .results is display:none until a plan exists). */
+  .shell:not(.article) {
+    @apply grid gap-4;
+  }
+
   .info {
-    @apply panel p-4 bg-white grid gap-2 mb-3;
+    @apply panel p-4 bg-white grid gap-2;
   }
 
   .info h2 { @apply m-0 text-base font-semibold; }
@@ -54,7 +63,9 @@
   .weights th, .weights td { @apply border border-border px-2 py-1 text-left; }
   .weights thead th { @apply bg-surface font-semibold; }
 
-  .site-footer { @apply mt-6 text-sm grid gap-2; }
+  .site-footer { @apply text-sm grid gap-2; }
+  /* Article page's shell is plain block flow (no gap), so its footer still needs its own top margin. */
+  .shell.article .site-footer { @apply mt-6; }
 
   .article h2 { @apply mt-6 mb-2 text-base font-semibold; }
   .article h3 { @apply mt-4 mb-1 text-sm font-semibold; }
@@ -173,7 +184,6 @@
   }
 
   .results {
-    @apply mt-2;
     display: none;
   }
 
@@ -289,7 +299,7 @@
   }
 
   .status-row {
-    @apply panel mt-2 flex items-center gap-2 text-sm font-mono p-4 bg-white;
+    @apply panel flex items-center gap-2 text-sm font-mono p-4 bg-white;
   }
 
   .status-icon { @apply text-base w-5 h-5 inline-flex items-center justify-center; }
