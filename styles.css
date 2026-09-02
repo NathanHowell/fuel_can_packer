@@ -285,7 +285,7 @@
   }
 
   .status-row {
-    @apply mt-2 flex items-center gap-2 text-sm font-mono border border-border rounded-lg px-3 py-2 bg-white;
+    @apply mt-2 flex items-center gap-2 text-sm font-mono border border-border rounded-lg p-4 bg-white;
   }
 
   .status-icon { @apply text-base w-5 h-5 inline-flex items-center justify-center; }
