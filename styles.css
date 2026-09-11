@@ -1,333 +1,1090 @@
 @import "tailwindcss";
 
-@theme {
-  --color-surface: #f2f2f2;
-  --color-panel: #ffffff;
-  --color-border: #b6b6b6;
-  --color-ink: #1f1f1f;
-  --color-muted: #4d4d4d;
-  --color-accent: #0066cc;
-  --color-focus: #003399;
-  --color-danger: #cc0000;
-  --color-warning: #c97a00;
+/* ---------------------------------------------------------------------------
+   Self-hosted faces. No third-party font CDN: esbuild copies these out of
+   node_modules into dist/fonts/ (stable names, see build.mts) and the CSP
+   allows font-src 'self' only.
 
-  --font-sans: "Verdana", "Geneva", "Tahoma", sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+   Big Shoulders Display  - condensed signage face, display sizes only.
+   Archivo                - grotesque workhorse, everything else, tabular figures.
+   Both SIL Open Font License 1.1.
+--------------------------------------------------------------------------- */
+@font-face {
+  font-family: "Big Shoulders Display Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("@fontsource-variable/big-shoulders-display/files/big-shoulders-display-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Archivo Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("@fontsource-variable/archivo/files/archivo-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ---------------------------------------------------------------------------
+   Tokens.
+
+   The palette is sampled from social-card.png / favicon.png, the artwork this
+   site already shipped but never showed: MSR-red canisters, brushed steel, on
+   a blue-black ground (#070A16 at the card's edges).
+
+   One rule runs through the whole page: red is fuel. It marks fuel in a can,
+   fuel moving between cans, and nothing else. Structure is steel.
+--------------------------------------------------------------------------- */
+:root {
+  color-scheme: light dark;
+
+  /* Brand constants - identical in both themes. */
+  --band: #080b16;          /* instrument ground, sampled from the artwork's edges */
+  --band-raised: #171b28;   /* a surface sitting on the band */
+  --band-line: #2c3243;
+  --band-ink: #e8eaf0;
+  --band-muted: #939bad;
+
+  --flame: #de3a14;         /* the canister red, sampled */
+  --flame-bright: #f4541f;  /* same red with enough lift to sit on the band */
+  --flame-deep: #a82409;    /* same red dark enough for text on paper */
+  --flame-text: var(--flame-deep);
+
+  /* Light theme. A cool workbench grey, not a warm paper. */
+  --ground: #e3e5ea;
+  --surface: #f7f8f9;
+  --surface-sunk: #d9dce2;
+  --line: #bcc1cb;
+  --line-strong: #8f96a4;
+  --ink: #171a21;
+  --muted: #565e6d;
+
+  --caution: #9a6100;
+  --caution-bg: #fbf1de;
+  --danger: var(--flame-deep);
+  --danger-bg: #fbe8e3;
+
+  --font-display: "Big Shoulders Display Variable", "Haettenschweiler", "Arial Narrow Bold", sans-serif;
+  --font-text: "Archivo Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Width of the drawn canister mark, by capacity. Cube root of the volume
+     ratio, so the three marks stand in true relative size to each other. */
+  --can-scale: 1;
+
+  /* How a can looks when it is "lit": hovering a row, its node, or the edge
+     between them highlights all three at once. Applied by the selector lists
+     app.ts generates. */
+  --lit-ring: 0 0 0 2px color-mix(in oklch, var(--flame) 45%, transparent);
+  --lit-edge-filter: drop-shadow(0 0 5px color-mix(in oklch, var(--flame-bright) 55%, transparent));
+
+  --radius: 3px;
+  --radius-lg: 6px;
+  --gutter: clamp(1rem, 4vw, 2.5rem);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Three levels, so --band panels still read as deep instrument wells:
+       sunk (#0d101a) < ground (#13161e) < surface (#1c202b). */
+    --ground: #13161e;
+    --surface: #1c202b;
+    --surface-sunk: #0d101a;
+    --line: #2b3140;
+    --line-strong: #545c6e;
+    --ink: #e6e8ee;
+    --muted: #99a1b2;
+
+    --caution: #e0a33c;
+    --caution-bg: #2a2113;
+    --flame-text: var(--flame-bright);
+    --danger: var(--flame-bright);
+    --danger-bg: #2c110a;
+  }
 }
 
 @layer base {
-  :root { color-scheme: light; }
-  * { @apply box-border; }
-  body {
-    @apply min-h-screen bg-surface text-ink flex justify-center px-4 pt-8 pb-12 sm:px-6 font-sans;
+  * {
+    box-sizing: border-box;
   }
-  .muted { @apply text-muted; }
-  header { @apply grid gap-2; }
-  header h1 { @apply text-lg font-semibold tracking-tight; }
-  header p { @apply text-muted; }
-  form { @apply grid gap-4; }
-}
 
-@utility panel {
-  @apply border border-border rounded-lg;
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-text);
+    font-size: 16px;
+    line-height: 1.55;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    margin: 0;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+
+  a:hover {
+    text-decoration-color: var(--flame);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--flame);
+    outline-offset: 2px;
+    border-radius: 1px;
+  }
+
+  .muted {
+    color: var(--muted);
+  }
 }
 
 @layer components {
+  /* -----------------------------------------------------------------------
+     Page frame
+  ----------------------------------------------------------------------- */
   .shell {
-    @apply w-full max-w-[1100px] bg-panel rounded-lg p-5 shadow-none;
+    width: 100%;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 0 4rem;
   }
 
-  /* Index page: shell's direct children are a stack of boxes. Space them
-     with one gap here instead of ad hoc margins on each box, so the gap
-     is the same everywhere no matter which two boxes end up adjacent
-     (e.g. .results is display:none until a plan exists). */
-  .shell:not(.article) {
-    @apply grid gap-4;
+  .bay {
+    padding-inline: var(--gutter);
   }
 
-  .info {
-    @apply panel p-4 bg-white grid gap-2;
+  /* -----------------------------------------------------------------------
+     Masthead. The artwork bleeds off the right edge and fades into the band,
+     which is set to the colour sampled from the artwork's own border.
+  ----------------------------------------------------------------------- */
+  /* Full-bleed band; the content inside it keeps the page's measure. */
+  .masthead {
+    overflow: hidden;
+    background: var(--band);
+    color: var(--band-ink);
+    border-bottom: 1px solid var(--band-line);
+    padding-block: clamp(1.75rem, 5vw, 2.75rem) clamp(1.5rem, 4vw, 2.25rem);
   }
 
-  .info h2 { @apply m-0 text-base font-semibold; }
-  .info p { @apply m-0 text-sm text-muted; }
-  .info ul { @apply m-0 pl-5 grid gap-1 list-disc; }
-  .info li { @apply text-sm text-ink; }
-  .info a, .site-footer a, .article a { @apply text-accent underline; }
-  .info details { @apply text-sm; }
-  .info summary { @apply cursor-pointer font-semibold text-ink; }
-  .info details p { @apply mt-1 pl-4; }
+  .masthead-inner {
+    position: relative;
+    width: 100%;
+    max-width: 1080px;
+    margin: 0 auto;
+    display: grid;
+    gap: 0.875rem;
+  }
 
-  .table-wrap { @apply overflow-x-auto; }
-  .weights { @apply w-full text-sm border-collapse; }
-  .weights th, .weights td { @apply border border-border px-2 py-1 text-left; }
-  .weights thead th { @apply bg-surface font-semibold; }
+  .masthead-art {
+    position: absolute;
+    right: calc(var(--gutter) * -0.35);
+    top: 50%;
+    translate: 0 -50%;
+    width: min(54%, 620px);
+    height: auto;
+    pointer-events: none;
+    user-select: none;
+    /* The artwork is a rectangle on a near-matching ground; fading all four
+       edges keeps it from reading as a pasted-in plate. */
+    -webkit-mask-image: radial-gradient(ellipse 78% 72% at 62% 50%, #000 42%, transparent 100%);
+    mask-image: radial-gradient(ellipse 78% 72% at 62% 50%, #000 42%, transparent 100%);
+  }
 
-  .site-footer { @apply text-sm grid gap-2; }
-  /* Article page's shell is plain block flow (no gap), so its footer still needs its own top margin. */
-  .shell.article .site-footer { @apply mt-6; }
+  .masthead-inner > :not(img) {
+    position: relative;
+    z-index: 1;
+  }
 
-  .article h2 { @apply mt-6 mb-2 text-base font-semibold; }
-  .article h3 { @apply mt-4 mb-1 text-sm font-semibold; }
-  .article p, .article li { @apply text-sm mb-2; }
-  .article ul { @apply pl-5 list-disc; }
-  .article ol { @apply pl-5 list-decimal; }
-  .article pre { @apply font-mono text-xs bg-surface border border-border rounded p-3 overflow-x-auto mb-3; }
+  /* Big Shoulders is a signage face: it is doing the work here, so it is set
+     large, tight and stacked rather than tinted, accented or tracked out. */
+  .masthead h1 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(2.75rem, 8vw, 4.75rem);
+    line-height: 0.85;
+    letter-spacing: 0.005em;
+    text-transform: uppercase;
+    max-width: 11ch;
+    text-wrap: balance;
+  }
+
+  .lede {
+    max-width: 34ch;
+    font-size: clamp(1rem, 2.2vw, 1.1875rem);
+    line-height: 1.45;
+    color: var(--band-ink);
+  }
+
+  /* Each sentence starts its own line, so the break lands on the full stop
+     rather than wherever the measure happens to run out. Sentences still wrap
+     normally within themselves on a narrow screen. */
+  .lede > span {
+    display: block;
+  }
+
+  .lede-sub {
+    max-width: 40ch;
+    font-size: 0.875rem;
+    color: var(--band-muted);
+  }
+
+  /* -----------------------------------------------------------------------
+     The tool
+  ----------------------------------------------------------------------- */
+  .rig {
+    margin-top: 2.25rem;
+    display: grid;
+    gap: 1rem;
+  }
+
+  .rig-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem 1.5rem;
+    padding-bottom: 0.625rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .rig-head h2 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .rig-head p {
+    font-size: 0.875rem;
+    color: var(--muted);
+  }
+
+  form {
+    display: grid;
+    gap: 1rem;
+  }
 
   .columns {
-    @apply grid gap-3;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
     counter-reset: can;
   }
 
+  /* A size column: the canister drawn to scale, its fixed weights, then the
+     cans of that size you own. */
   .column {
-    @apply panel p-4 grid gap-2 bg-gradient-to-b from-white/5 to-transparent content-start;
+    display: grid;
+    gap: 0.5rem;
+    align-content: start;
+    padding: 0.875rem 0.875rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--line-strong);
+    border-radius: var(--radius);
   }
 
-  .column h2 { @apply m-0 text-base font-semibold; }
-  .hint { @apply text-muted text-xs m-0; }
-  .cells { @apply grid gap-2 content-start; }
+  .column[data-spec="msr110"] { --can-scale: 1; }
+  .column[data-spec="msr227"] { --can-scale: 1.27; }
+  .column[data-spec="msr450"] { --can-scale: 1.6; }
 
+  /* The three marks share a baseline and stand in true relative size, so the
+     columns show the difference between a 110 g and a 450 g can before you
+     read a single number. */
+  .column-head {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: end;
+    gap: 0 0.75rem;
+  }
+
+  .can-bay {
+    display: flex;
+    align-items: flex-end;
+    height: 4rem;
+  }
+
+  .can-mark {
+    display: block;
+    height: calc(40px * var(--can-scale));
+    width: auto;
+  }
+
+  .can-mark g {
+    stroke: var(--ink);
+    stroke-width: 5;
+    stroke-linejoin: round;
+  }
+
+  .can-mark .can-body { fill: var(--flame); }
+  .can-mark .can-collar,
+  .can-mark .can-valve { fill: var(--line-strong); }
+
+  .column h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .hint {
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+
+  .cells {
+    display: grid;
+    gap: 0.375rem;
+    align-content: start;
+    margin-top: 0.25rem;
+  }
+
+  /* -----------------------------------------------------------------------
+     A cell is a tank. Type a gross weight and it fills, left to right, with
+     the amount of fuel that implies. The bar is always flame: length is the
+     only variable, because length is the only thing being reported.
+  ----------------------------------------------------------------------- */
   .cell {
-    @apply panel relative flex items-center bg-white h-14 pl-[42px] pr-3 overflow-hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 2.875rem;
+    padding: 0 0.625rem 0 2.25rem;
+    background: var(--surface-sunk);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
     counter-increment: can;
   }
 
+  /* Fuel level. */
   .cell::after {
     content: "";
     position: absolute;
-    inset: 6px;
-    border-radius: 0.5rem;
+    left: 0;
+    bottom: 0;
+    height: 5px;
     width: var(--fill-pct, 0%);
-    max-width: calc(100% - 12px);
-    background: var(--fill-color-hsl, transparent);
-    background: var(--fill-color-oklch, var(--fill-color-hsl, transparent));
-    opacity: 0.28;
+    background: var(--flame);
+    transition: width 140ms ease;
     pointer-events: none;
-    transition: width 120ms ease, background-color 120ms ease, opacity 120ms ease;
   }
 
+  /* Can number, assigned in fill order by app.ts; the transfer graph refers
+     to cans by this number, so it is a name, not an ornament. */
   .cell::before {
     content: "#" counter(can);
     position: absolute;
-    left: 12px;
+    left: 0.625rem;
     top: 50%;
-    transform: translateY(-50%);
-    color: var(--color-muted);
-    font-size: 13px;
-    font-weight: 600;
+    translate: 0 -50%;
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 700;
   }
 
-  .cell:has(input:placeholder-shown) { counter-increment: none; }
-  .cell:has(input:placeholder-shown)::before { content: ""; }
-  .cell label { @apply hidden; }
+  .cell:has(input:placeholder-shown) {
+    counter-increment: none;
+    padding-left: 0.625rem;
+    background: transparent;
+    border-style: dashed;
+  }
+
+  .cell:has(input:placeholder-shown)::before {
+    content: "";
+  }
+
+  .cell:has(input:focus-visible) {
+    border-color: var(--flame);
+    background: var(--surface);
+  }
+
+  .cell label {
+    display: none;
+  }
 
   .cell input {
-    @apply w-full border border-border bg-white text-ink text-sm py-1.5 px-2 rounded-lg outline-none;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: right;
+    padding: 0;
   }
 
   .cell input:focus-visible {
-    @apply outline outline-1 outline-focus border-focus;
+    outline: 2px solid var(--flame);
+    outline-offset: -3px;
+    border-radius: 2px;
+  }
+
+  .cell input:placeholder-shown {
+    text-align: left;
+  }
+
+  .cell input::placeholder {
+    font-weight: 400;
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+
+  /* Spinners fight a numeric readout; the keyboard still steps the value. */
+  .cell input::-webkit-outer-spin-button,
+  .cell input::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+
+  .cell input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
   }
 
   .cell[data-fill-state="overflow"],
   .node[data-fill-state="overflow"] {
-    @apply border-[var(--color-danger)];
-    background: color-mix(in hsl, var(--color-danger) 12%, white);
-    background: color-mix(in oklch, var(--color-danger) 12%, white);
+    border-color: var(--danger);
+    background: var(--danger-bg);
   }
 
   .cell[data-fill-state="overflow"]::before {
-    color: var(--color-danger);
+    color: var(--danger);
   }
 
   .cell[data-fill-state="underflow"] {
-    @apply border-[var(--color-warning)];
-    background: color-mix(in hsl, var(--color-warning) 12%, white);
-    background: color-mix(in oklch, var(--color-warning) 12%, white);
+    border-color: var(--caution);
+    background: var(--caution-bg);
   }
 
   .cell[data-fill-state="underflow"]::before {
-    color: var(--color-warning);
+    color: var(--caution);
   }
 
-  button {
-    @apply inline-flex items-center justify-start bg-gradient-to-b from-slate-50 to-slate-200 text-slate-900 border border-slate-500 rounded px-3 py-2 font-semibold cursor-pointer shadow-inner transition-colors duration-100;
+  .cell[data-fill-state="underflow"]::after {
+    background: var(--caution);
   }
 
-  button:hover {
-    @apply from-slate-100 to-slate-300 border-slate-600;
-  }
-
-  button:active {
-    @apply bg-slate-300 border-slate-700;
-  }
-
+  /* -----------------------------------------------------------------------
+     Input problems
+  ----------------------------------------------------------------------- */
   .input-errors {
-    @apply hidden grid gap-2;
+    display: none;
+    gap: 0.5rem;
   }
 
   .input-errors[data-visible="true"] {
-    @apply grid;
+    display: grid;
+  }
+
+  .input-errors .error-msg,
+  .input-errors .warn-msg {
+    padding: 0.625rem 0.75rem;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    border-left: 3px solid;
   }
 
   .input-errors .error-msg {
-    @apply border border-[var(--color-danger)] text-[var(--color-danger)] rounded-lg px-3 py-2 text-sm;
-    background: color-mix(in hsl, var(--color-danger) 12%, white);
-    background: color-mix(in oklch, var(--color-danger) 12%, white);
+    color: var(--danger);
+    background: var(--danger-bg);
+    border-color: var(--danger);
   }
 
   .input-errors .warn-msg {
-    @apply border border-[var(--color-warning)] text-[var(--color-warning)] rounded-lg px-3 py-2 text-sm;
-    background: color-mix(in hsl, var(--color-warning) 12%, white);
-    background: color-mix(in oklch, var(--color-warning) 12%, white);
+    color: var(--caution);
+    background: var(--caution-bg);
+    border-color: var(--caution);
   }
 
+  /* -----------------------------------------------------------------------
+     Status strip. Sits directly under the form it reports on.
+  ----------------------------------------------------------------------- */
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    border-radius: var(--radius);
+    background: var(--surface-sunk);
+    color: var(--muted);
+  }
+
+  .status-icon {
+    width: 1.125rem;
+    display: inline-flex;
+    justify-content: center;
+    flex: none;
+  }
+
+  .status-row[data-state="idle"] .status-icon::before { content: "\2022"; }
+  .status-row[data-state="solving"] .status-icon::before {
+    content: "\28CB";
+    animation: spinner-frames 0.9s steps(10) infinite;
+  }
+  .status-row[data-state="error"] .status-icon::before { content: "\26A0"; }
+
+  .status-row[data-state="solving"] { color: var(--flame-text); }
+  .status-row[data-state="success"] {
+    color: var(--ink);
+  }
+
+  .status-row[data-state="success"] .status-icon::before {
+    content: "\2022";
+    color: var(--flame);
+  }
+  .status-row[data-state="error"] {
+    color: var(--danger);
+    background: var(--danger-bg);
+  }
+
+  /* -----------------------------------------------------------------------
+     The plan. This is the one loud thing on the page: a dark instrument
+     panel in both themes, with fuel visibly moving from the cans you leave
+     behind into the cans you carry.
+  ----------------------------------------------------------------------- */
   .results {
     display: none;
   }
 
   .results[data-visible="true"] {
-    @apply grid gap-3;
+    display: grid;
+    gap: 0;
+    background: var(--band);
+    color: var(--band-ink);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
   }
 
   .results[data-loading="true"] {
-    @apply opacity-50 pointer-events-none transition-opacity duration-150 ease-in-out;
+    opacity: 0.45;
+    pointer-events: none;
+    transition: opacity 150ms ease;
   }
-
-  .solution { @apply grid; }
-
-  .solution-grid {
-    @apply grid gap-3;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  }
-
-  .solution-card {
-    @apply panel p-3 bg-white grid gap-2;
-    align-content: start;
-  }
-
-  .solution-card h3 { @apply m-0 text-sm font-semibold; }
-
-  .solution-list {
-    @apply m-0 pl-5 grid gap-1 text-sm;
-    list-style: disc;
-  }
-
-  .solution-list li { @apply leading-snug; }
 
   .graph-panel {
-    @apply panel relative p-4 bg-slate-50 min-h-[240px] overflow-hidden;
+    position: relative;
+    padding: 1.125rem 1.125rem 1.25rem;
+    min-height: 230px;
+    overflow: hidden;
   }
 
+  .graph-headers,
   .graph-grid {
-    @apply relative grid gap-3 h-full;
-    grid-template-columns: 1fr minmax(160px, 0.8fr) 1fr;
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: 1fr minmax(150px, 0.95fr) 1fr;
   }
 
   .graph-headers {
-    @apply grid gap-3 mb-1 text-muted font-semibold text-xs px-0.5;
-    grid-template-columns: 1fr minmax(160px, 0.8fr) 1fr;
+    margin-bottom: 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--band-muted);
   }
 
-  .node-column { @apply grid gap-2 content-start; }
+  .graph-headers > :last-child {
+    text-align: right;
+  }
+
+  .graph-grid {
+    position: relative;
+    height: 100%;
+  }
+
+  .node-column {
+    display: grid;
+    gap: 0.5rem;
+    align-content: start;
+  }
 
   .spacer {
-    @apply relative h-full;
-    min-height: 160px;
+    position: relative;
+    height: 100%;
+    min-height: 150px;
   }
 
   .node {
-    @apply panel p-2.5 bg-white grid gap-1 relative overflow-hidden;
+    position: relative;
     z-index: 1;
+    display: grid;
+    gap: 0.0625rem;
+    padding: 0.5rem 0.625rem 0.625rem;
+    background: var(--band-raised);
+    border: 1px solid var(--band-line);
+    border-radius: var(--radius);
+    overflow: hidden;
   }
 
   .node::after {
     content: "";
     position: absolute;
-    inset: 6px;
-    border-radius: 0.5rem;
+    left: 0;
+    bottom: 0;
+    height: 4px;
     width: var(--fill-pct, 0%);
-    max-width: calc(100% - 12px);
-    background: var(--fill-color-hsl, transparent);
-    background: var(--fill-color-oklch, var(--fill-color-hsl, transparent));
-    opacity: 0.25;
+    background: var(--flame-bright);
     pointer-events: none;
+  }
+
+  .node strong {
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+
+  .node .muted {
+    color: var(--band-muted);
+    font-size: 0.75rem;
+    line-height: 1.35;
   }
 
   .node:hover,
   .node[data-hovered="true"] {
-    border-color: var(--color-focus);
-    box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-focus) 35%, transparent), 0 6px 18px -12px rgba(0, 0, 0, 0.35);
+    border-color: var(--flame);
+    box-shadow: var(--lit-ring);
   }
 
-  .node strong { @apply text-sm; }
-  .node .muted { @apply text-muted text-xs; }
-
   .graph-panel svg {
-    @apply absolute inset-0;
+    position: absolute;
+    inset: 0;
     pointer-events: none;
     z-index: 0;
   }
+
   .edge {
-    @apply stroke-accent fill-none;
+    fill: none;
+    stroke: var(--flame-bright);
     stroke-width: var(--edge-width, 2px);
-    stroke-opacity: var(--edge-opacity, 0.5);
+    stroke-opacity: var(--edge-opacity, 0.72);
     stroke-linecap: butt;
     stroke-linejoin: round;
-    mix-blend-mode: multiply;
     pointer-events: visibleStroke;
-    transition: stroke 150ms ease, stroke-opacity 150ms ease, filter 150ms ease;
+    transition: stroke-opacity 150ms ease;
   }
 
   .edge:hover,
   .edge[data-hovered="true"] {
-    stroke: var(--color-focus);
-    stroke-opacity: 0.95;
-    filter: drop-shadow(0 0 6px rgba(0, 51, 153, 0.25));
+    stroke-opacity: 1;
+    filter: var(--lit-edge-filter);
   }
-
 
   .edge-label {
-    @apply fill-muted text-[12px] font-sans;
+    fill: var(--band-ink);
+    font-family: var(--font-text);
+    font-size: 12px;
+    font-weight: 600;
     pointer-events: none;
-    filter:
-      drop-shadow(0 1px 2px rgba(255, 255, 255, 0.9))
-      drop-shadow(0 -1px 2px rgba(255, 255, 255, 0.9))
-      drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
     paint-order: stroke fill;
+    stroke: var(--band);
+    stroke-width: 3px;
+    stroke-linejoin: round;
   }
 
-  .status-row {
-    @apply panel flex items-center gap-2 text-sm font-mono p-4 bg-white;
+  /* Readout strip along the bottom of the panel. */
+  .solution {
+    display: grid;
+    border-top: 1px solid var(--band-line);
+    background: color-mix(in oklch, var(--band) 80%, #fff 4%);
   }
 
-  .status-icon { @apply text-base w-5 h-5 inline-flex items-center justify-center; }
-  /*.status-icon::before { content: "•"; display: block; }*/
-  .status-row[data-state="idle"] .status-icon::before { content: "•"; }
-  .status-row[data-state="solving"] .status-icon::before {
-    content: "⠋";
-    animation: spinner-frames 0.9s steps(10) infinite;
+  .solution-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   }
-  .status-row[data-state="success"] .status-icon::before { content: "✅"; }
-  .status-row[data-state="error"] .status-icon::before { content: "⚠️"; }
 
-  .status-row[data-state="idle"] { @apply text-muted; }
-  .status-row[data-state="solving"] { color: var(--color-accent); }
-  .status-row[data-state="success"] { color: #0f8f3a; }
-  .status-row[data-state="error"] { color: var(--color-danger); }
+  .solution-card {
+    display: grid;
+    gap: 0.4375rem;
+    align-content: start;
+    padding: 1rem 1.125rem 1.125rem;
+    border-left: 1px solid var(--band-line);
+  }
+
+  .solution-card:first-child {
+    border-left: 0;
+  }
+
+  .solution-card h3 {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--band-muted);
+  }
+
+  .solution-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+  }
+
+  .solution-list li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    line-height: 1.4;
+    color: var(--band-ink);
+  }
+
+  .readout {
+    flex: none;
+    font-weight: 600;
+  }
+
+  .solution-list li.muted {
+    color: var(--band-muted);
+  }
+
+  /* Totals are the answer to the question the page asks, so this is the one
+     place the display face comes back at size. */
+  #totals-list li {
+    border-bottom: 1px solid var(--band-line);
+    padding-bottom: 0.3125rem;
+  }
+
+  #totals-list li:last-child {
+    border-bottom: 0;
+  }
+
+  #totals-list .readout {
+    font-family: var(--font-display);
+    font-size: 1.625rem;
+    font-weight: 700;
+    line-height: 0.9;
+    letter-spacing: 0.01em;
+  }
+
+  /* -----------------------------------------------------------------------
+     Reference material. Deliberately not another rank of bordered cards:
+     one rule per section and plain running text.
+  ----------------------------------------------------------------------- */
+  .reference {
+    margin-top: 3.5rem;
+    display: grid;
+    gap: 2.5rem;
+    align-items: start;
+  }
+
+  @media (min-width: 900px) {
+    .reference {
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      column-gap: 3rem;
+    }
+
+    /* The Q&A runs the full measure under both columns. */
+    .reference > [aria-labelledby="faq"] {
+      grid-column: 1 / -1;
+    }
+  }
+
+  .info {
+    display: grid;
+    gap: 0.625rem;
+  }
+
+  .info h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    padding-bottom: 0.375rem;
+    border-bottom: 2px solid var(--ink);
+    max-width: none;
+  }
+
+  .info p {
+    font-size: 0.9375rem;
+    color: var(--muted);
+    max-width: 72ch;
+  }
+
+  .info ul {
+    margin: 0;
+    padding-left: 1.125rem;
+    display: grid;
+    gap: 0.3125rem;
+    list-style: square;
+  }
+
+  .info li {
+    font-size: 0.9375rem;
+    color: var(--muted);
+    max-width: 70ch;
+  }
+
+  .info li::marker {
+    color: var(--flame);
+  }
+
+  .info details {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 0.625rem;
+  }
+
+  .info summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    list-style-position: outside;
+  }
+
+  .info summary::marker {
+    color: var(--flame);
+  }
+
+  .info details p {
+    margin-top: 0.375rem;
+    max-width: 70ch;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+
+  .weights {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+    min-width: 26rem;
+  }
+
+  .weights th,
+  .weights td {
+    padding: 0.4375rem 0.75rem 0.4375rem 0;
+    text-align: right;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .weights thead th {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--muted);
+    border-bottom-width: 2px;
+    border-bottom-color: var(--line-strong);
+  }
+
+  .weights th:first-child,
+  .weights td:first-child {
+    text-align: left;
+  }
+
+  .weights tbody th {
+    font-weight: 700;
+  }
+
+  /* -----------------------------------------------------------------------
+     Footer
+  ----------------------------------------------------------------------- */
+  .site-footer {
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--line);
+    display: grid;
+    gap: 0.75rem 3rem;
+    align-items: start;
+    font-size: 0.875rem;
+  }
+
+  @media (min-width: 900px) {
+    .site-footer {
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    }
+  }
+
+  .site-footer p {
+    max-width: 72ch;
+  }
+
+  .disclaimer {
+    border-left: 3px solid var(--flame);
+    padding-left: 0.75rem;
+  }
+
+  /* -----------------------------------------------------------------------
+     Algorithm article
+  ----------------------------------------------------------------------- */
+  .backlink {
+    font-size: 0.875rem;
+    color: var(--band-muted);
+  }
+
+  .backlink a {
+    text-decoration-color: var(--band-muted);
+  }
+
+  /* The article is one column of running text all the way down, so the page
+     measure is the text measure: the masthead content, the section rules and
+     the paragraphs all share a right edge. Only the dark band runs full width,
+     the same as on the calculator.
+
+     This is keyed off a class rather than :has(.prose) on purpose. An
+     unsupported selector invalidates the whole rule, so on a browser without
+     :has() the article would lose its measure entirely and set full width. */
+  .shell.article,
+  .masthead-inner.article {
+    max-width: 768px;
+  }
+
+  /* A reference page, not a landing page. The calculator's masthead is the
+     brand moment and earns a full screen; here the reader came for the
+     algorithm, so the header says what this is at one line and gets out of
+     the way, leaving the first screen mostly content. */
+  .masthead.article {
+    padding-block: clamp(1.25rem, 3vw, 1.75rem);
+  }
+
+  .masthead-inner.article {
+    gap: 0.5rem;
+  }
+
+  .masthead-inner.article h1 {
+    font-size: clamp(2rem, 5.5vw, 2.75rem);
+    line-height: 0.95;
+    max-width: 22ch;
+  }
+
+  .masthead-inner.article .lede {
+    font-size: 1rem;
+    max-width: 56ch;
+  }
+
+  .prose {
+    margin-top: 2.5rem;
+  }
+
+  .prose h2 {
+    margin: 2.25rem 0 0.625rem;
+    font-size: 1rem;
+    font-weight: 700;
+    padding-bottom: 0.375rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .prose h3 {
+    margin: 1.5rem 0 0.375rem;
+    font-size: 0.9375rem;
+    font-weight: 700;
+  }
+
+  .prose p,
+  .prose li {
+    font-size: 0.9375rem;
+    color: var(--muted);
+    margin-bottom: 0.625rem;
+  }
+
+  .prose ul {
+    padding-left: 1.125rem;
+    list-style: square;
+  }
+
+  .prose ol {
+    padding-left: 1.25rem;
+    list-style: decimal;
+  }
+
+  .prose ul li::marker {
+    color: var(--flame);
+  }
+
+  .prose pre {
+    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    font-size: 0.8125rem;
+    background: var(--surface-sunk);
+    border-left: 3px solid var(--line-strong);
+    padding: 0.75rem 0.875rem;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+  }
 }
 
 @keyframes spinner-frames {
-  0% { content: "⠋"; }
-  10% { content: "⠙"; }
-  20% { content: "⠹"; }
-  30% { content: "⠸"; }
-  40% { content: "⠼"; }
-  50% { content: "⠴"; }
-  60% { content: "⠦"; }
-  70% { content: "⠧"; }
-  80% { content: "⠇"; }
-  90% { content: "⠏"; }
-  100% { content: "⠋"; }
+  0%   { content: "\28CB"; }
+  10%  { content: "\28D9"; }
+  20%  { content: "\28B9"; }
+  30%  { content: "\28B8"; }
+  40%  { content: "\28BC"; }
+  50%  { content: "\28B4"; }
+  60%  { content: "\28A6"; }
+  70%  { content: "\28A7"; }
+  80%  { content: "\2887"; }
+  90%  { content: "\288F"; }
+  100% { content: "\28CB"; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@media (max-width: 640px) {
+  /* No room to set the artwork beside the headline, so it runs full width
+     above it rather than washing out underneath the text. */
+  .masthead-art {
+    position: static;
+    width: calc(100% + var(--gutter) * 2);
+    margin-inline: calc(var(--gutter) * -1);
+    margin-bottom: -0.25rem;
+    translate: none;
+  }
+
+  /* The side-by-side transfer map needs width it does not have here. Donors
+     and recipients stack, and the drawn edges drop out: the transfers list
+     below already gives every pair and every gram. */
+  .graph-panel {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .graph-headers,
+  .graph-grid {
+    display: contents;
+  }
+
+  .graph-headers > :nth-child(1) { order: 1; }
+  #donor-column { order: 2; }
+  .graph-headers > :nth-child(2) { display: none; }
+  .graph-headers > :nth-child(3) {
+    order: 3;
+    margin-top: 0.75rem;
+    text-align: left;
+  }
+  #recipient-column { order: 4; }
+  .spacer { display: none; }
+
+  .solution-card {
+    border-left: 0;
+    border-top: 1px solid var(--band-line);
+  }
+
+  .solution-card:first-child {
+    border-top: 0;
+  }
 }

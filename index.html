@@ -23,10 +23,13 @@
   <meta name="twitter:title" content="Isobutane Fuel Canister Transfer &amp; Weight Calculator">
   <meta name="twitter:description" content="Weigh your 110g, 227g, and 450g isobutane canisters and get an optimal transfer plan to carry the fewest, lightest cans.">
   <meta name="twitter:image" content="https://fuel.for.alienz.org/dist/social-card.jpg">
-  <meta name="theme-color" content="#f2f2f2">
+  <meta name="theme-color" content="#e3e5ea" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#05070e" media="(prefers-color-scheme: dark)">
   <meta name="author" content="Nathan Howell">
   <link rel="manifest" href="./manifest.webmanifest">
   <title>Isobutane Fuel Canister Transfer &amp; Weight Calculator (MSR, Jetboil, Snow Peak)</title>
+  <link rel="preload" href="./dist/fonts/archivo-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./dist/fonts/big-shoulders-display-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="./dist/app.css">
   <script type="application/ld+json">
     {
@@ -80,117 +83,156 @@
   </script>
 </head>
 <body>
+  <header class="masthead">
+    <div class="masthead-inner bay">
+      <img class="masthead-art"
+           src="./dist/hero-900.webp"
+           srcset="./dist/hero-900.webp 900w, ./dist/hero-1800.webp 1800w"
+           sizes="(max-width: 640px) 86vw, min(54vw, 620px)"
+           width="2497" height="1024" alt="" fetchpriority="high" decoding="async">
+      <h1>Fuel canister transfer calculator</h1>
+      <p class="lede"><span>Weigh your half-used isobutane cans.</span> <span>Get the lightest way to carry the same fuel.</span></p>
+      <p class="lede-sub">110&nbsp;g, 227&nbsp;g and 450&nbsp;g threaded canisters: MSR, Jetboil, Snow Peak, GSI, Coleman, Primus. Everything runs in your browser.</p>
+    </div>
+  </header>
+
   <div class="shell">
-    <header>
-      <h1>Fuel Canister Transfer Calculator</h1>
-      <p>Have too many partially used isobutane canisters (MSR, Jetboil, Snow Peak, GSI, Coleman, Primus)? Want to carry the fewest, lightest cans and make the fewest transfers?</p>
-      <p>Weigh each can on a kitchen scale, enter the gross weights below, and the optimal transfer plan is calculated instantly in your browser.</p>
-    </header>
-    <section class="info" aria-labelledby="how-to">
-      <h2 id="how-to">How to use the calculator</h2>
-      <p>Supported sizes: 110g, 227g, and 450g threaded isobutane canisters. Gross weight = empty can weight + remaining fuel.</p>
-      <ul>
-        <li>Type the gross weight (in grams) of each can by size. Add as many rows as you have cans.</li>
-        <li>The solver finds an optimal transfer plan that reduces total cans carried and empty weight.</li>
-        <li>See a donor/recipient graph, exact gram transfers, and total carry weight once inputs are valid.</li>
-      </ul>
-      <p class="muted">Tip: Values lighter than an empty can or heavier than its capacity are flagged so you can correct typos quickly.</p>
-    </section>
-    <form id="pack-form">
-      <div class="columns" id="columns">
-      </div>
-      <template id="column-template">
-        <div class="column" data-spec="">
-          <h2 data-part="name"></h2>
-          <p class="hint" data-part="hint"></p>
-          <div class="cells" data-spec=""></div>
+    <main class="bay">
+      <div class="rig">
+        <div class="rig-head">
+          <h2>Your cans</h2>
+          <p>Put each can on a kitchen scale and enter what it weighs now, fuel and all.</p>
         </div>
-      </template>
-      <template id="cell-template">
-        <div class="cell">
-          <input type="number" placeholder="Gross weight (g)" min="0" step="1">
-        </div>
-      </template>
-      <div class="input-errors" id="input-errors" data-visible="false">
-        <div class="error-msg" data-error="overflow">Gross weight exceeds that can’s fuel capacity.</div>
-        <div class="warn-msg" data-error="underflow">Gross weight is below the empty can weight.</div>
-      </div>
-    </form>
-    <div class="results" id="results" data-visible="false">
-      <div class="graph-panel">
-        <div class="graph-headers">
-          <div>Donors</div>
-          <div aria-hidden="true"></div>
-          <div>Recipients</div>
-        </div>
-        <div class="graph-grid">
-          <div class="node-column" id="donor-column"></div>
-          <div class="spacer" aria-hidden="true">
-            <svg id="graph-svg"></svg>
+
+        <form id="pack-form">
+          <div class="columns" id="columns">
           </div>
-          <div class="node-column" id="recipient-column"></div>
+          <template id="column-template">
+            <div class="column" data-spec="">
+              <div class="column-head">
+                <div class="can-bay">
+                  <svg class="can-mark" viewBox="0 0 100 110" aria-hidden="true" focusable="false">
+                    <g>
+                      <rect class="can-valve" x="43" y="4" width="14" height="14" rx="3"/>
+                      <rect class="can-collar" x="34" y="14" width="32" height="13" rx="4"/>
+                      <path class="can-body" d="M12 98V54c0-17 14-29 38-29s38 12 38 29v44z"/>
+                      <rect class="can-collar" x="7" y="90" width="86" height="15" rx="5"/>
+                    </g>
+                  </svg>
+                </div>
+                <div class="column-id">
+                  <h2 data-part="name"></h2>
+                  <p class="hint" data-part="hint"></p>
+                </div>
+              </div>
+              <div class="cells" data-spec=""></div>
+            </div>
+          </template>
+          <template id="cell-template">
+            <div class="cell">
+              <input type="number" placeholder="Gross weight (g)" min="0" step="1" inputmode="numeric">
+            </div>
+          </template>
+          <div class="input-errors" id="input-errors" data-visible="false">
+            <div class="error-msg" data-error="overflow">That is more fuel than the can holds. Check the weight.</div>
+            <div class="warn-msg" data-error="underflow">That is lighter than the empty can. Check the weight.</div>
+          </div>
+        </form>
+
+        <div class="status-row" id="status-row" data-state="idle" role="status" aria-live="polite">
+          <div class="status-icon" id="status-icon" aria-hidden="true"></div>
+          <div class="status-text" id="status-text">Ready</div>
+        </div>
+
+        <div class="results" id="results" data-visible="false">
+          <div class="graph-panel">
+            <div class="graph-headers">
+              <div>Empty these</div>
+              <div aria-hidden="true"></div>
+              <div>Carry these</div>
+            </div>
+            <div class="graph-grid">
+              <div class="node-column" id="donor-column"></div>
+              <div class="spacer" aria-hidden="true">
+                <svg id="graph-svg"></svg>
+              </div>
+              <div class="node-column" id="recipient-column"></div>
+            </div>
+          </div>
+          <div class="solution" id="solution">
+            <div class="solution-grid">
+              <div class="solution-card">
+                <h3>Cans to keep</h3>
+                <ul class="solution-list" id="keep-list"></ul>
+              </div>
+              <div class="solution-card">
+                <h3>Transfers</h3>
+                <ul class="solution-list" id="transfer-list"></ul>
+              </div>
+              <div class="solution-card">
+                <h3>Totals</h3>
+                <ul class="solution-list" id="totals-list"></ul>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="solution" id="solution">
-        <div class="solution-grid">
-          <div class="solution-card">
-            <h3>Cans to keep</h3>
-            <ul class="solution-list" id="keep-list"></ul>
+
+      <div class="reference">
+        <section class="info" aria-labelledby="how-to">
+          <h2 id="how-to">How to use the calculator</h2>
+          <p>Supported sizes are 110&nbsp;g, 227&nbsp;g and 450&nbsp;g threaded isobutane canisters. Gross weight is the empty can plus whatever fuel is left in it, which is exactly what your scale reads.</p>
+          <ul>
+            <li>Enter the gross weight in grams of each can, in the column for its size. Rows appear as you fill them, so add as many cans as you own.</li>
+            <li>The solver picks the set of cans with the lowest total empty weight that still holds all your fuel.</li>
+            <li>Once every weight is plausible you get a donor and recipient map, the exact grams to move, and what the result weighs on your back.</li>
+          </ul>
+          <p>Weights below an empty can or above its capacity are flagged as you type, so a transposed digit does not quietly become a plan.</p>
+        </section>
+
+        <section class="info" aria-labelledby="weights">
+          <h2 id="weights">Isobutane canister empty and full weights</h2>
+          <p>Weigh a can and subtract the empty weight to see how many grams of fuel remain. These are the MSR figures the solver uses; other brands are typically within a few grams.</p>
+          <div class="table-wrap">
+            <table class="weights">
+              <thead>
+                <tr><th scope="col">Canister</th><th scope="col">Fuel capacity</th><th scope="col">Empty weight</th><th scope="col">Full gross weight</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">110 g (small)</th><td>110 g</td><td>101 g</td><td>211 g</td></tr>
+                <tr><th scope="row">227 g (medium)</th><td>227 g</td><td>147 g</td><td>374 g</td></tr>
+                <tr><th scope="row">450 g (large)</th><td>450 g</td><td>216 g</td><td>666 g</td></tr>
+              </tbody>
+            </table>
           </div>
-          <div class="solution-card">
-            <h3>Transfers</h3>
-            <ul class="solution-list" id="transfer-list"></ul>
-          </div>
-          <div class="solution-card">
-            <h3>Totals</h3>
-            <ul class="solution-list" id="totals-list"></ul>
-          </div>
-        </div>
+        </section>
+
+        <section class="info" aria-labelledby="faq">
+          <h2 id="faq">Frequently asked questions</h2>
+          <details>
+            <summary>How much fuel is left in my isobutane canister?</summary>
+            <p>Weigh the canister on a kitchen scale and subtract the empty can weight: about 101 g for a 110 g can, 147 g for a 227 g can, and 216 g for a 450 g can. The remainder is fuel in grams.</p>
+          </details>
+          <details>
+            <summary>Can you transfer fuel between isobutane canisters?</summary>
+            <p>Yes. A threaded canister-to-canister transfer adapter connects two Lindal-valve cans. Chill the receiving can and warm the donor can so pressure moves fuel downhill, then verify the result on a scale. Do it outdoors, away from flames, and never fill a can above its rated capacity.</p>
+          </details>
+          <details>
+            <summary>Does this calculator work with Jetboil, Snow Peak, GSI, or Coleman canisters?</summary>
+            <p>Yes. Most 110 g, 230 g, and 450 g isobutane canisters share the same threaded Lindal valve and very similar empty weights, so the MSR figures are a close match. If your brand's empty weight differs by a few grams, the plan is still correct; only the reported remaining fuel shifts slightly.</p>
+          </details>
+          <details>
+            <summary>What does the calculator optimize?</summary>
+            <p>It finds the set of cans with the lowest total empty weight that can hold all of your fuel, then the fewest transfers and fewest grams moved to fill them. Everything runs in your browser; no data is uploaded. Read <a href="./algorithm.html">how the solver works</a> for the details.</p>
+          </details>
+        </section>
       </div>
-    </div>
-    <div class="status-row" id="status-row" data-state="idle" role="status" aria-live="polite">
-      <div class="status-icon" id="status-icon" aria-hidden="true"></div>
-      <div class="status-text" id="status-text">Ready</div>
-    </div>
-    <section class="info" aria-labelledby="weights">
-      <h2 id="weights">Isobutane canister empty and full weights</h2>
-      <p>Weigh a can and subtract the empty weight to see how many grams of fuel remain. These are the MSR figures used by the solver; other brands are typically within a few grams.</p>
-      <div class="table-wrap">
-        <table class="weights">
-          <thead>
-            <tr><th scope="col">Canister</th><th scope="col">Fuel capacity</th><th scope="col">Empty weight</th><th scope="col">Full gross weight</th></tr>
-          </thead>
-          <tbody>
-            <tr><th scope="row">110 g (small)</th><td>110 g</td><td>101 g</td><td>211 g</td></tr>
-            <tr><th scope="row">227 g (medium)</th><td>227 g</td><td>147 g</td><td>374 g</td></tr>
-            <tr><th scope="row">450 g (large)</th><td>450 g</td><td>216 g</td><td>666 g</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-    <section class="info" aria-labelledby="faq">
-      <h2 id="faq">Frequently asked questions</h2>
-      <details>
-        <summary>How much fuel is left in my isobutane canister?</summary>
-        <p>Weigh the canister on a kitchen scale and subtract the empty can weight: about 101 g for a 110 g can, 147 g for a 227 g can, and 216 g for a 450 g can. The remainder is fuel in grams.</p>
-      </details>
-      <details>
-        <summary>Can you transfer fuel between isobutane canisters?</summary>
-        <p>Yes. A threaded canister-to-canister transfer adapter connects two Lindal-valve cans. Chill the receiving can and warm the donor can so pressure moves fuel downhill, then verify the result on a scale. Do it outdoors, away from flames, and never fill a can above its rated capacity.</p>
-      </details>
-      <details>
-        <summary>Does this calculator work with Jetboil, Snow Peak, GSI, or Coleman canisters?</summary>
-        <p>Yes. Most 110 g, 230 g, and 450 g isobutane canisters share the same threaded Lindal valve and very similar empty weights, so the MSR figures are a close match. If your brand's empty weight differs by a few grams, the plan is still correct; only the reported remaining fuel shifts slightly.</p>
-      </details>
-      <details>
-        <summary>What does the calculator optimize?</summary>
-        <p>It finds the set of cans with the lowest total empty weight that can hold all of your fuel, then the fewest transfers and fewest grams moved to fill them. Everything runs in your browser; no data is uploaded. Read <a href="./algorithm.html">how the solver works</a> for the details.</p>
-      </details>
-    </section>
-    <footer class="site-footer">
-      <p class="muted disclaimer">Disclaimer: this calculator moves numbers, you move pressurized flammable gas. Transfer outdoors, away from flames, never overfill, and check your work on a scale. If it goes wrong, that is on you, not the math.</p>
-      <p class="muted">Built by <a href="https://github.com/NathanHowell">Nathan Howell</a>. <a href="./algorithm.html">How the solver works</a> · <a href="https://github.com/NathanHowell/fuel_can_packer">Source code</a></p>
-    </footer>
+
+      <footer class="site-footer">
+        <p class="muted disclaimer">This calculator moves numbers, you move pressurized flammable gas. Transfer outdoors, away from flames, never overfill, and check your work on a scale. If it goes wrong, that is on you, not the math.</p>
+        <p class="muted">Built by <a href="https://github.com/NathanHowell">Nathan Howell</a>. <a href="./algorithm.html">How the solver works</a>. <a href="https://github.com/NathanHowell/fuel_can_packer">Source code</a>.</p>
+      </footer>
+    </main>
   </div>
   <script type="module" src="./dist/app.js"></script>
 </body>

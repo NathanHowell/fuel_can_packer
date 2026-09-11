@@ -16,32 +16,13 @@ function getFinalFuel(plan: Plan, idx: number): number {
   return plan.final_fuel[idx] ?? 0;
 }
 
-interface FillColors {
-  oklch: string;
-  hsl: string;
-}
-
 type FillState = "normal" | "overflow" | "underflow";
 
-function fillColors(fuel: number, capacity: number): FillColors {
-  if (fuel > capacity) {
-    return { oklch: "var(--color-danger)", hsl: "var(--color-danger)" };
-  }
-
-  const ratio = Math.max(0, Math.min(1, fuel / capacity));
-  const pct = ratio * 100;
-
-  const redOklch = "oklch(0.62 0.24 29)";
-  const greenOklch = "oklch(0.77 0.19 142)";
-  const redHsl = "hsl(0 70% 55%)";
-  const greenHsl = "hsl(120 70% 55%)";
-
-  return {
-    oklch: `color-mix(in oklch, ${redOklch} ${100 - pct}%, ${greenOklch} ${pct}%)`,
-    hsl: `color-mix(in hsl, ${redHsl} ${100 - pct}%, ${greenHsl} ${pct}%)`,
-  };
-}
-
+/**
+ * Report a can's fuel level to CSS. How full a can is decides the length of
+ * its gauge and nothing else; colour is the stylesheet's business, so this
+ * sets a percentage and a state and leaves it there.
+ */
 function applyFillStyle(
   el: HTMLElement,
   fuel: number,
@@ -49,10 +30,7 @@ function applyFillStyle(
   opts?: { gross?: number; emptyWeight?: number }
 ): void {
   const pct = Math.max(0, Math.min(100, (fuel / capacity) * 100));
-  const colors = fillColors(fuel, capacity);
   el.style.setProperty("--fill-pct", `${pct}%`);
-  el.style.setProperty("--fill-color-oklch", colors.oklch);
-  el.style.setProperty("--fill-color-hsl", colors.hsl);
 
   let state: FillState = "normal";
   if (opts?.gross !== undefined && opts.emptyWeight !== undefined && opts.gross < opts.emptyWeight) {
@@ -122,6 +100,8 @@ function setStatus(state: StatusState, message: string): void {
 
 interface ListItem {
   readonly text: string;
+  /** Right-hand figure. Rendered in the display face and aligned down the column. */
+  readonly value?: string;
   readonly muted?: boolean;
 }
 
@@ -129,7 +109,16 @@ function renderList(list: HTMLUListElement, items: readonly ListItem[]): void {
   list.innerHTML = "";
   for (const item of items) {
     const li = document.createElement("li");
-    li.textContent = item.text;
+    if (item.value === undefined) {
+      li.textContent = item.text;
+    } else {
+      const label = document.createElement("span");
+      label.textContent = item.text;
+      const value = document.createElement("span");
+      value.className = "readout";
+      value.textContent = item.value;
+      li.append(label, value);
+    }
     if (item.muted) {li.classList.add("muted");}
     list.appendChild(li);
   }
@@ -221,7 +210,7 @@ function createColumn(spec: CanSpec): { column: HTMLDivElement; cellsContainer: 
     const hint = document.createElement("p");
     hint.className = "hint";
     const grossMax = spec.emptyWeight + spec.capacity;
-    hint.textContent = `Empty weight: ${spec.emptyWeight}g • Full weight: ${grossMax}g`;
+    hint.textContent = `Empty ${spec.emptyWeight} g, full ${grossMax} g`;
     column.appendChild(hint);
 
     const cellsContainer = document.createElement("div");
@@ -244,7 +233,7 @@ function createColumn(spec: CanSpec): { column: HTMLDivElement; cellsContainer: 
   cellsContainer.dataset["spec"] = spec.key;
   heading.textContent = spec.name;
   const grossMax = spec.emptyWeight + spec.capacity;
-  hint.textContent = `Empty weight: ${spec.emptyWeight}g • Full weight: ${grossMax}g`;
+  hint.textContent = `Empty ${spec.emptyWeight} g, full ${grossMax} g`;
 
   return { column, cellsContainer };
 }
@@ -293,8 +282,6 @@ function updateCellFill(cell: HTMLDivElement, input: HTMLInputElement): void {
 
   if (input.value === "") {
     cell.style.setProperty("--fill-pct", "0%");
-    cell.style.removeProperty("--fill-color-oklch");
-    cell.style.removeProperty("--fill-color-hsl");
     cell.removeAttribute("data-fill-state");
     return;
   }
@@ -345,7 +332,7 @@ function startWorkerSolve(requestId: number, cans: Can[]): void {
       renderSolution(canObjects, plan);
       resultsEl.setAttribute("data-visible", "true");
       resultsEl.removeAttribute("data-loading");
-      setStatus("success", "Complete");
+      setStatus("success", "Plan ready");
     } else {
       resultsEl.removeAttribute("data-loading");
       setStatus("error", `Error: ${data.error}`);
@@ -412,7 +399,7 @@ async function runCompute(): Promise<void> {
 
   if (cans.length === 0) {
     if (requestId !== currentRequestId) {return;}
-    setStatus("idle", "Add gross weights to compute");
+    setStatus("idle", "Enter a weight to get a plan");
     if (inputErrorsEl !== null) {
       inputErrorsEl.setAttribute("data-visible", "false");
     }
@@ -427,7 +414,7 @@ async function runCompute(): Promise<void> {
 
   if (foundUnderflow || foundOverflow) {
     if (requestId !== currentRequestId) {return;}
-    setStatus("error", "Invalid input found. Fix the highlighted cans.");
+    setStatus("error", "Check the highlighted weights");
     if (inputErrorsEl !== null) {
       inputErrorsEl.setAttribute("data-visible", "true");
       if (overflowErrorEl) {
@@ -492,7 +479,7 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
     node.innerHTML = `
       <strong>Can #${canNum}</strong>
       <div class="muted">${can.spec.name}</div>
-      <div class="muted">${can.fuel}g → discarded</div>
+      <div class="muted">${can.fuel} g to move out</div>
     `;
 
     donorColumnEl.appendChild(node);
@@ -514,7 +501,9 @@ function renderGraph(cans: readonly Can[], plan: Plan): void {
     node.innerHTML = `
       <strong>Can #${canNum}</strong>
       <div class="muted">${can.spec.name}</div>
-      <div class="muted">${can.fuel}g → ${finalFuel}g</div>
+      <div class="muted">${
+        finalFuel === can.fuel ? `${can.fuel} g, unchanged` : `${can.fuel} g to ${finalFuel} g`
+      }</div>
     `;
 
     recipientColumnEl.appendChild(node);
@@ -731,12 +720,11 @@ function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipient
     path.dataset["fromNum"] = String(edge.fromNum);
     path.dataset["toNum"] = String(edge.toNum);
     path.style.setProperty("--edge-width", `${strokeWidth}px`);
-    path.style.setProperty("--edge-opacity", "0.5");
     graphSvgEl.appendChild(path);
 
     const labelX = x1 + 12; // keep label aligned with donor
     const labelY = y1 + labelOffset;
-    addLabel(labelX, labelY, "start", `${amt}g`);
+    addLabel(labelX, labelY, "start", `${amt} g`);
 
     const prevSum = recipientSums.get(toIdx) ?? 0;
     recipientSums.set(toIdx, prevSum + amt);
@@ -749,7 +737,7 @@ function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipient
     const x = toRect.left - gridRect.left - 10;
     const y = toRect.top + toRect.height / 2 - gridRect.top;
 
-    addLabel(x, y, "end", `${total}g`);
+    addLabel(x, y, "end", `${total} g`);
   }
 
   const ensureHoverStyleEl = (): HTMLStyleElement => {
@@ -835,16 +823,17 @@ function drawEdges(cans: readonly Can[], plan: Plan, donors: number[], recipient
   const edgeHighlightList = Array.from(edgeHighlightSelectors);
   const canHighlightList = Array.from(canHighlightSelectors);
 
+  // Only the selector lists are dynamic - which cans exist, and which of them
+  // are connected. What "lit" looks like stays in styles.css, as tokens.
   const hoverCss = `
 ${edgeHighlightList.join(",\n")} {
-  stroke: var(--color-focus);
-  stroke-opacity: 0.95;
-  filter: drop-shadow(0 0 6px rgba(0, 51, 153, 0.25));
+  stroke-opacity: 1;
+  filter: var(--lit-edge-filter);
 }
 
 ${canHighlightList.join(",\n")} {
-  border-color: var(--color-focus);
-  box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-focus) 35%, transparent), 0 6px 18px -12px rgba(0, 0, 0, 0.35);
+  border-color: var(--flame);
+  box-shadow: var(--lit-ring);
 }
 `;
 
@@ -863,7 +852,8 @@ function renderSolution(cans: readonly Can[], plan: Plan): void {
     const finalFuel = getFinalFuel(plan, i);
     const canNum = can.id;
     keepItems.push({
-      text: `Can #${canNum} — ${can.spec.name} — ${finalFuel}g fuel`,
+      text: `Can #${canNum}, ${can.spec.name}`,
+      value: `${finalFuel} g`,
     });
   }
   if (keepItems.length === 0) {
@@ -883,7 +873,8 @@ function renderSolution(cans: readonly Can[], plan: Plan): void {
         const fromNum = fromCan.id;
         const toNum = toCan.id;
         transferItems.push({
-          text: `Can #${fromNum} -> Can #${toNum} — ${amt}g`,
+          text: `Can #${fromNum} to Can #${toNum}`,
+          value: `${amt} g`,
         });
       }
     }
@@ -901,10 +892,10 @@ function renderSolution(cans: readonly Can[], plan: Plan): void {
   const keptCount = plan.keep.reduce((a, keep) => a + (keep ? 1 : 0), 0);
 
   const totalsItems: ListItem[] = [
-    { text: `Total fuel: ${totalFuel}g` },
-    { text: `Total weight to carry: ${totalWeight}g` },
-    { text: `Cans carried: ${keptCount}` },
-    { text: `Transfer steps: ${transferCount}` },
+    { text: "Weight on your back", value: `${totalWeight} g` },
+    { text: "Fuel carried", value: `${totalFuel} g` },
+    { text: "Cans carried", value: String(keptCount) },
+    { text: "Transfers", value: String(transferCount) },
   ];
 
   renderList(keepListEl, keepItems);
@@ -914,4 +905,4 @@ function renderSolution(cans: readonly Can[], plan: Plan): void {
 
 // Initialize on load
 renderColumns();
-setStatus("idle", "Ready");
+setStatus("idle", "Enter a weight to get a plan");

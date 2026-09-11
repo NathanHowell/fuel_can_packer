@@ -23,8 +23,11 @@
   <meta name="twitter:title" content="How the Fuel Canister Transfer Calculator Works">
   <meta name="twitter:description" content="The optimization algorithm behind the isobutane canister consolidation calculator: search strategy, complexity, and limits.">
   <meta name="twitter:image" content="https://fuel.for.alienz.org/dist/social-card.jpg">
-  <meta name="theme-color" content="#f2f2f2">
+  <meta name="theme-color" content="#e3e5ea" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#05070e" media="(prefers-color-scheme: dark)">
   <title>How the Fuel Canister Transfer Calculator Works</title>
+  <link rel="preload" href="./dist/fonts/archivo-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./dist/fonts/big-shoulders-display-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="./dist/app.css">
   <script type="application/ld+json">
     {
@@ -41,13 +44,17 @@
   </script>
 </head>
 <body>
-  <div class="shell article">
-    <header>
-      <p class="muted"><a href="./">← Back to the calculator</a></p>
-      <h1>How the Fuel Canister Transfer Calculator Works</h1>
-      <p>Given a set of partially filled isobutane cans of various sizes, the solver decides which cans to keep and how to redistribute fuel among them so the total empty weight you carry is minimized while all of your fuel is accommodated.</p>
-    </header>
+  <header class="masthead article">
+    <div class="masthead-inner bay article">
+      <p class="backlink"><a href="./">Back to the calculator</a></p>
+      <h1>How the solver works</h1>
+      <p class="lede">Given a drawer of part-used cans, it decides which ones to keep and how to move the fuel so you carry the least empty weight.</p>
+    </div>
+  </header>
 
+  <div class="shell article">
+    <main class="bay">
+      <article class="prose">
     <h2>Algorithm approach</h2>
     <p>The solver uses a <strong>greedy search with backtracking</strong> that explores the solution space systematically in three stages.</p>
 
@@ -139,10 +146,13 @@ if (workload > 5_000_000) throw Error</code></pre>
     <h2>References</h2>
     <p>The allocation subproblem is related to bin packing, the transportation problem, and capacity-constrained bipartite assignment. The solver trades guaranteed optimality of the transfer schedule for practical performance, giving excellent results for real-world backpacking scenarios in well under a second.</p>
 
-    <footer class="site-footer">
-      <p class="muted disclaimer">Disclaimer: this calculator moves numbers, you move pressurized flammable gas. Transfer outdoors, away from flames, never overfill, and check your work on a scale. If it goes wrong, that is on you, not the math.</p>
-      <p class="muted"><a href="./">Fuel canister transfer calculator</a> · <a href="https://github.com/NathanHowell/fuel_can_packer">Source code</a> · Built by <a href="https://github.com/NathanHowell">Nathan Howell</a></p>
-    </footer>
+      </article>
+
+      <footer class="site-footer">
+        <p class="muted disclaimer">This calculator moves numbers, you move pressurized flammable gas. Transfer outdoors, away from flames, never overfill, and check your work on a scale. If it goes wrong, that is on you, not the math.</p>
+        <p class="muted"><a href="./">Fuel canister transfer calculator</a>. <a href="https://github.com/NathanHowell/fuel_can_packer">Source code</a>. Built by <a href="https://github.com/NathanHowell">Nathan Howell</a>.</p>
+      </footer>
+    </main>
   </div>
 </body>
 </html>
