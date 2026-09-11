@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "Fuel canister transfer calculator for MSR 110g, 227g, and 450g isobutane cans.",
   "type": "module",
+  "packageManager": "pnpm@11.10.0",
   "scripts": {
-    "lint": "node --import tsx ./node_modules/.bin/eslint .",
-    "lint:fix": "node --import tsx ./node_modules/.bin/eslint . --fix",
+    "lint": "node --import tsx ./node_modules/eslint/bin/eslint.js .",
+    "lint:fix": "node --import tsx ./node_modules/eslint/bin/eslint.js . --fix",
     "typecheck": "tsc --noEmit",
     "bundle": "tsx ./build.mts",
     "bundle:watch": "tsx ./build.mts --watch",
@@ -28,6 +29,8 @@
   "license": "ISC",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@fontsource-variable/big-shoulders-display": "^5.3.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^26.4.0",
     "esbuild": "^0.28.2",

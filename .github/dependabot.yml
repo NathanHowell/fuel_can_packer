@@ -3,7 +3,7 @@
 
 version: 2
 updates:
-  # Monitor npm dependencies
+  # Monitor JS dependencies (the "npm" ecosystem also reads pnpm-lock.yaml)
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -16,7 +16,7 @@ updates:
       - "dependencies"
       - "automated"
     commit-message:
-      prefix: "npm"
+      prefix: "deps"
       include: "scope"
     # Group all updates together to ensure compatible versions
     groups:

@@ -2,7 +2,7 @@ name = "fuel"
 compatibility_date = "2024-12-10"
 
 [build]
-command = "npm ci && npm run build:deploy"
+command = "pnpm install --frozen-lockfile && pnpm run build:deploy"
 
 [assets]
 directory = "_site"

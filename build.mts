@@ -133,6 +133,36 @@ function createSocialCardPlugin(): Plugin {
   };
 }
 
+function createHeroImagePlugin(): Plugin {
+  const sourceFilename = "social-card.png";
+  const widths: readonly number[] = [900, 1800];
+  const outputDir = "dist";
+
+  return {
+    name: "hero-image",
+    setup(buildCtx: PluginBuild): void {
+      buildCtx.onStart(async (): Promise<void> => {
+        const cwd = buildCtx.initialOptions.absWorkingDir ?? process.cwd();
+        const sourcePath = join(cwd, sourceFilename);
+        await mkdir(join(cwd, outputDir), { recursive: true });
+
+        await Promise.all(
+          widths.map(async (width) => {
+            const outputPath = join(cwd, outputDir, `hero-${width}.webp`);
+            await sharp(sourcePath)
+              .resize({ width, withoutEnlargement: true })
+              .webp({ quality: 80, effort: 5 })
+              .toFile(outputPath);
+          }),
+        );
+
+        const names = widths.map((w): string => `hero-${w}.webp`).join(", ");
+        console.log(`Generated masthead artwork in ${outputDir}: ${names}`);
+      });
+    },
+  };
+}
+
 function createFaviconPlugin(): Plugin {
   const sourceFilename = "favicon.png";
   const pngOutputs: readonly { size: number; filename: string }[] = [
@@ -194,9 +224,17 @@ const buildOptions: BuildOptions = {
   sourcemap: true,
   minify,
   entryNames: "[name]",
+  // Self-hosted woff2 faces referenced from styles.css land in dist/fonts/ under
+  // their own names so index.html can preload them by a stable path.
+  assetNames: "fonts/[name]",
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  loader: { ".css": "css" },
-  plugins: [createPostcssPlugin(), createSocialCardPlugin(), createFaviconPlugin()],
+  loader: { ".css": "css", ".woff2": "file" },
+  plugins: [
+    createPostcssPlugin(),
+    createSocialCardPlugin(),
+    createHeroImagePlugin(),
+    createFaviconPlugin(),
+  ],
   logLevel: "info",
 };
 
